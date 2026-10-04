@@ -2,6 +2,9 @@
   "name": "ipuku-fe",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",
@@ -9,24 +12,30 @@
     "lint": "eslint",
     "dev:https": "next dev -p 3001 --experimental-https --experimental-https-key ./certificates/lan-key.pem --experimental-https-cert ./certificates/lan.pem --experimental-https-ca ./certificates/ipuku-dev-ca.pem",
     "icons": "node scripts/generate-icons.mjs",
-    "dev:cert": "bash scripts/dev-cert.sh"
+    "dev:cert": "bash scripts/dev-cert.sh",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy:dev": "opennextjs-cloudflare build && opennextjs-cloudflare deploy --env dev",
+    "cf:deploy:prod": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.0",
-    "next": "16.3.7",
+    "next": "^16.3.8",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "^0.0.1",
     "uuid": "^14.0.2"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.8",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.7",
+    "eslint-config-next": "^16.3.8",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.147.0"
   }
 }

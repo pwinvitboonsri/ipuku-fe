@@ -9,9 +9,9 @@
       "port": 3000
     },
     {
-      "name": "ipuku-fe-cf-spike",
-      "runtimeExecutable": "bash",
-      "runtimeArgs": ["-c", "cd /private/tmp/claude-501/-Users-bwinvitboonsri-New-Wings-Codename-Leo-topics-03-nestjs-backend-architecture-project-ipuku-fe/a140170b-9b5e-4222-9709-f0ecab238f76/scratchpad/ipuku-fe-cf && npx wrangler dev --port 8787 --ip 127.0.0.1 --inspector-port 9230"],
+      "name": "ipuku-fe-cf-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["opennextjs-cloudflare", "preview", "--port", "8787"],
       "port": 8787
     }
   ]

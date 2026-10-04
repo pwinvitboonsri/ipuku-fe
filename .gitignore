@@ -42,3 +42,12 @@ next-env.d.ts
 
 # local HTTPS dev certs (contain private keys)
 /certificates
+
+# Cloudflare (OpenNext / wrangler)
+/.open-next/
+/.wrangler/
+.dev.vars
+!.dev.vars.example
+
+# internal docs
+DEPLOY.md

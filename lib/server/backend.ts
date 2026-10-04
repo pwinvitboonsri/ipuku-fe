@@ -1,5 +1,6 @@
 import "server-only";
 import { createHmac } from "node:crypto";
+import { headers as requestHeaders } from "next/headers";
 import { UNREACHABLE_HEADER } from "@/lib/connectivity";
 
 // Server-side access to the NestJS API. The browser never talks to NestJS directly:
@@ -29,6 +30,16 @@ function deviceSignature(method: string, pathAndQuery: string) {
 
 const SIGNED_ROUTES = new Set(["GET /v1/auth"]);
 
+// Every call reaches NestJS from this server, so the API would rate-limit the whole shop as one IP.
+// Pass the tablet's IP along, with BFF_KEY proving it came from us. cf-connecting-ip is set by
+// Cloudflare and can't be spoofed by the client; locally there is none and nothing is sent.
+async function clientIpHeaders(): Promise<Record<string, string>> {
+  const key = process.env.BFF_KEY;
+  if (!key) return {};
+  const ip = (await requestHeaders()).get("cf-connecting-ip");
+  return ip ? { "x-client-ip": ip, "x-bff-key": key } : {};
+}
+
 export async function callBackend(
   method: string,
   pathAndQuery: string,
@@ -37,6 +48,7 @@ export async function callBackend(
   const headers: Record<string, string> = { accept: "application/json" };
   if (body !== undefined) headers["content-type"] = "application/json";
   if (token) headers.authorization = `Bearer ${token}`;
+  Object.assign(headers, await clientIpHeaders());
   let url: string;
   try {
     url = baseUrl() + pathAndQuery;

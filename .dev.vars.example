@@ -1,0 +1,4 @@
+# Copy to .dev.vars (git-ignored) for `npm run cf:preview` — overrides wrangler.jsonc vars locally.
+API_BASE_URL=http://127.0.0.1:3000
+HMAC_SECRET=
+BFF_KEY=

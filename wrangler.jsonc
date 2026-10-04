@@ -1,0 +1,24 @@
+// Cloudflare Workers config (OpenNext). Default = production, `--env dev` = dev.
+//   prod: ipuku-fe      <- branch main     -> https://ipuku-api.onrender.com
+//   dev:  ipuku-fe-dev  <- branch develop  -> https://ipuku-api-dev.onrender.com
+// Secrets (HMAC_SECRET, BFF_KEY) are set per worker in the Cloudflare dashboard, not here.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "main": ".open-next/worker.js",
+  "name": "ipuku-fe",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  // html_handling none: otherwise /offline.html redirects to /offline and the service worker's offline page breaks
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS", "html_handling": "none" },
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "ipuku-fe" }],
+  "vars": { "API_BASE_URL": "https://ipuku-api.onrender.com" },
+  "keep_vars": true,
+  "observability": { "enabled": true },
+  "env": {
+    "dev": {
+      "name": "ipuku-fe-dev",
+      "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "ipuku-fe-dev" }],
+      "vars": { "API_BASE_URL": "https://ipuku-api-dev.onrender.com" }
+    }
+  }
+}

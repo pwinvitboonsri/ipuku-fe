@@ -1,0 +1,10 @@
+# Cloudflare serves files in public/ before Next runs, so next.config.ts headers() don't apply to them.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+
+/sw.js
+  Content-Type: application/javascript; charset=utf-8
+  Cache-Control: no-cache, no-store, must-revalidate
+  Content-Security-Policy: default-src 'self'; script-src 'self'
