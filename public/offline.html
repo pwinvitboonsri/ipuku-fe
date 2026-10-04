@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#F5F1E8" />
+<title>Offline · Ippuku POS</title>
+<style>
+  :root { --paper: #F5F1E8; --ink: #1C1814; --ink-2: #3A332B; --muted: #8A8378; --persimmon: #C8553D; --matcha: #6B7F4A; --yuzu: #D4A537; }
+  html, body { margin: 0; height: 100%; background: var(--paper); color: var(--ink); font-family: system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+  body { display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; }
+  .bar { position: fixed; top: 0; left: 0; right: 0; height: 4px; opacity: .55; background: linear-gradient(90deg, var(--matcha), var(--yuzu), var(--persimmon)); }
+  .card { max-width: 420px; text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+  .brand { font-family: Georgia, serif; font-style: italic; font-size: 36px; letter-spacing: -.8px; line-height: 1; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--persimmon); animation: pulse 1.4s ease infinite; }
+  h1 { font-size: 18px; font-weight: 600; margin: 4px 0 0; }
+  p { font-size: 14px; color: var(--ink-2); line-height: 1.5; margin: 0; }
+  button { margin-top: 8px; font: inherit; font-weight: 600; font-size: 15px; padding: 14px 22px; border-radius: 12px; border: 0; background: var(--ink); color: var(--paper); cursor: pointer; }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(1.35); } }
+</style>
+</head>
+<body>
+  <div class="bar"></div>
+  <div class="card">
+    <div class="brand">Ippuku</div>
+    <div class="dot"></div>
+    <h1>This tablet is offline</h1>
+    <p>Check the Wi-Fi connection. The POS reopens as soon as it can reach the server.</p>
+    <button onclick="location.reload()">Try again</button>
+  </div>
+  <script>window.addEventListener("online", function () { location.reload(); });</script>
+</body>
+</html>
