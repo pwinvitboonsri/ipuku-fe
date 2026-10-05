@@ -49,7 +49,7 @@ export function Shifts() {
       <PageHead title="Shifts" sub="Past cash sessions — tap one for its sales report. Variance = counted − (float + cash taken − cash refunded)." />
       {cur && (
         <button type="button" onClick={() => setSel(cur)} className="tap text-left">
-          <Card className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 p-3.5">
+          <Card pad={14} className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
             <Pill tone="OPEN">Open now</Pill>
             <span className="text-[13.5px]">
               {shortDate(cur.open_at)} · opened {clock(cur.open_at)}

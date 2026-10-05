@@ -85,7 +85,7 @@ function CashPanel({ total, busy, onConfirm }: { total: number; busy: boolean; o
         </div>
         <div className="contents @[520px]:flex @[520px]:min-h-0 @[520px]:flex-1 @[520px]:flex-col @[520px]:gap-2.5">
           <div
-            className="order-1 flex min-h-0 flex-col gap-1.5 overflow-hidden rounded-[12px] px-[18px] py-3.5 @[520px]:order-none @[520px]:flex-1"
+            className="order-1 flex min-h-0 shrink-0 flex-col gap-1.5 overflow-hidden rounded-[12px] px-[18px] py-3.5 @[520px]:order-none @[520px]:flex-1 @[520px]:shrink"
             style={{
               transition: "background-color 260ms ease, color 260ms ease, border-color 260ms ease",
               background: change > 0 ? "var(--ink)" : "var(--paper-2)",

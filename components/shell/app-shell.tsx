@@ -76,10 +76,10 @@ function AppHeader({ user, shiftSince, onAccount }: { user: SessionStaff; shiftS
     // 640–1099px: [brand · account] then [mode · counter tabs].
     // Phone: [brand · mode · account] then the counter tabs sharing the full width.
     // On a phone the tabs wrapper is display:contents so its two children can be placed on different rows.
-    <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2.5 border-b border-line bg-paper px-3 py-2.5 sm:gap-x-3.5 sm:px-[18px] min-[1100px]:flex-nowrap min-[1100px]:py-3 short-land:flex-nowrap short-land:py-2">
+    <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2.5 border-b border-line bg-paper px-3 py-2.5 sm:gap-x-3.5 sm:px-[18px] wide:flex-nowrap wide:py-3 short-land:flex-nowrap short-land:py-2">
       <Brandmark small />
       {!bare && (
-        <div className="contents sm:order-4 sm:flex sm:w-full sm:min-w-0 sm:items-center sm:gap-3.5 sm:overflow-x-auto min-[1100px]:order-none min-[1100px]:w-auto min-[1100px]:overflow-visible short-land:order-none short-land:w-auto short-land:flex-1">
+        <div className="contents sm:order-4 sm:flex sm:w-full sm:min-w-0 sm:items-center sm:gap-3.5 sm:overflow-x-auto wide:order-none wide:w-auto wide:overflow-visible short-land:order-none short-land:w-auto short-land:flex-1">
           {isOwner && (
             <div className="order-2 ml-auto shrink-0 sm:order-none sm:ml-0">
               <GlassTabs
@@ -109,12 +109,12 @@ function AppHeader({ user, shiftSince, onAccount }: { user: SessionStaff; shiftS
           )}
         </div>
       )}
-      <div className="hidden flex-1 min-[1100px]:block" />
+      <div className="hidden flex-1 wide:block" />
       <button
         type="button"
         onClick={onAccount}
         aria-label="Account"
-        className={`tap order-3 flex shrink-0 items-center gap-2.5 rounded-full bg-paper-2 p-1 sm:ml-auto sm:pr-2.5 min-[1100px]:order-none min-[1100px]:ml-0 short-land:order-none short-land:pr-1 ${isOwner && !bare ? "" : "ml-auto"}`}
+        className={`tap order-3 flex shrink-0 items-center gap-2.5 rounded-full bg-paper-2 p-1 sm:ml-auto sm:pr-2.5 wide:order-none wide:ml-0 short-land:order-none short-land:pr-1 ${isOwner && !bare ? "" : "ml-auto"}`}
       >
         <div className="flex h-[30px] w-[30px] items-center justify-center rounded-full text-[13px] font-semibold text-paper" style={{ background: staffTone(user.id) }}>
           {user.name[0]}

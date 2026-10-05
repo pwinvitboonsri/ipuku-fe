@@ -168,7 +168,9 @@ export function GlassTabs<T extends string>({
         gap: vertical ? 2 : 0,
         padding: 3,
         borderRadius: radius,
-        width: full && !vertical ? "100%" : undefined,
+        // Shrink-wrap the items: as a plain block the track would stop at the parent's width
+        // while the tabs overflow past it inside a scroll row.
+        width: full ? "100%" : "max-content",
         boxSizing: "border-box",
         background: track ? "var(--paper-2)" : "transparent",
         boxShadow: track ? "inset 0 1px 2px rgba(28,24,20,0.07), inset 0 0 0 1px rgba(28,24,20,0.03)" : "none",

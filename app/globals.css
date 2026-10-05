@@ -3,6 +3,12 @@
 /* Landscape phones: too short to stack, so screens put their parts side by side. */
 @custom-variant short-land (@media (max-height: 520px) and (orientation: landscape));
 
+/* One-row app header from 1100px. In rem like Tailwind's own breakpoints, so `wide:` sorts after
+   `sm:`/`md:` and wins over them (a px arbitrary `min-[1100px]:` can't be ordered against rem ones). */
+@theme {
+  --breakpoint-wide: 68.75rem;
+}
+
 /* Ippuku design tokens — from the Claude Design handoff (Ippuku POS.html) */
 :root {
   --paper: #F5F1E8;

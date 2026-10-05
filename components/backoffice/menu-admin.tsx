@@ -11,6 +11,7 @@ import { Btn } from "@/components/ui/btn";
 import { ErrorNote, PageHead, Pill, Toggle } from "@/components/ui/bits";
 import { Field, TextInput } from "@/components/ui/form";
 import { GlassTabs } from "@/components/ui/glass-tabs";
+import { ScrollRow } from "@/components/ui/scroll-row";
 import { Sheet } from "@/components/ui/sheet";
 import { Table, tdCls, thCls } from "@/components/ui/table";
 import { ItemPhoto } from "@/components/counter/item-photo";
@@ -182,7 +183,7 @@ export function MenuAdmin() {
             />
             <div className="flex flex-wrap items-center gap-2.5">
               {cats.length > 0 && (
-                <div className="scroll max-w-full overflow-x-auto">
+                <ScrollRow selected={cat?.id} className="max-w-full">
                   <GlassTabs
                     value={cat?.id ?? ""}
                     onChange={setCatId}
@@ -197,7 +198,7 @@ export function MenuAdmin() {
                       count: all.filter((p) => p.category_id === c.id && (showInactive || p.is_active)).length,
                     }))}
                   />
-                </div>
+                </ScrollRow>
               )}
               <button type="button" onClick={() => setSheet("category")} className="tap text-[12.5px] text-muted underline underline-offset-[3px]">
                 Edit order &amp; names
