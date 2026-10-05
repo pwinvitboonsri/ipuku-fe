@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { useIngredients } from "@/lib/backoffice";
 import { useMediaQuery } from "@/lib/orientation";
 import { GlassTabs } from "@/components/ui/glass-tabs";
+import { ScrollRow } from "@/components/ui/scroll-row";
 
 const NAV = [
   { id: "/backoffice/menu", label: "Menu" },
@@ -27,17 +28,19 @@ export function BackofficeShell({ children }: { children: ReactNode }) {
 
   return (
     <div className={`relative flex min-h-0 flex-1 ${rail ? "" : "flex-col"}`}>
-      <nav
-        className={
-          rail
-            ? "w-[196px] shrink-0 border-r border-line bg-paper px-3 py-4"
-            : "scroll flex shrink-0 overflow-x-auto border-b border-line bg-paper px-3 py-2"
-        }
-      >
-        <div className={rail ? "" : "shrink-0"}>
-          <GlassTabs vertical={rail} full={rail} radius={10} value={current} onChange={(id) => router.push(id)} items={items} />
-        </div>
-      </nav>
+      {rail ? (
+        <nav className="w-[196px] shrink-0 border-r border-line bg-paper px-3 py-4">
+          <GlassTabs vertical full radius={10} value={current} onChange={(id) => router.push(id)} items={items} />
+        </nav>
+      ) : (
+        <nav className="shrink-0 border-b border-line bg-paper px-1.5 py-2 sm:px-3">
+          <ScrollRow selected={current} className="flex">
+            <div className="shrink-0 px-1.5 sm:px-0">
+              <GlassTabs radius={10} value={current} onChange={(id) => router.push(id)} items={items} />
+            </div>
+          </ScrollRow>
+        </nav>
+      )}
       <div key={current} className="screen-enter relative flex min-h-0 min-w-0 flex-1 flex-col">
         {children}
       </div>

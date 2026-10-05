@@ -2,7 +2,9 @@
 
 import { money } from "@/lib/format";
 import type { MenuCategory, MenuProduct } from "@/lib/types";
+import { usePhone } from "@/lib/orientation";
 import { GlassTabs } from "@/components/ui/glass-tabs";
+import { ScrollRow } from "@/components/ui/scroll-row";
 import { ItemPhoto } from "./item-photo";
 
 // Category tabs + search. Inactive products never arrive from /menu, so they never render here.
@@ -19,12 +21,13 @@ export function CategoryTabs({
   search: string | null;
   onSearch: (q: string | null) => void;
 }) {
+  const phone = usePhone();
   return (
-    <div className="flex items-center gap-2 border-b border-line bg-paper px-3 pb-2.5 pt-3 sm:gap-2.5 sm:px-5 sm:pb-3 sm:pt-3.5">
+    <div className="flex items-center gap-1 border-b border-line bg-paper py-2.5 pl-3 pr-1.5 sm:gap-2.5 sm:px-5 sm:pb-3 sm:pt-3.5">
       {search === null ? (
-        <div className="scroll min-w-0 overflow-x-auto">
-          <GlassTabs size="lg" value={active} onChange={onChange} items={categories.map((c) => ({ id: c.id, label: c.name, count: c.products.length }))} />
-        </div>
+        <ScrollRow selected={active}>
+          <GlassTabs size={phone ? "md" : "lg"} value={active} onChange={onChange} items={categories.map((c) => ({ id: c.id, label: c.name, count: c.products.length }))} />
+        </ScrollRow>
       ) : (
         <input
           autoFocus

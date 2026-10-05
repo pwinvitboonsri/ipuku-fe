@@ -21,5 +21,8 @@ export function useMediaQuery(query: string, serverDefault = false) {
 export const WIDE_QUERY = "(min-width: 700px) and (orientation: landscape)";
 export const useWideLayout = () => useMediaQuery(WIDE_QUERY, true);
 
+// Phone width (below Tailwind's `sm`): compact tabs that share the row evenly.
+export const usePhone = () => useMediaQuery("(max-width: 639px)", false);
+
 // Two-pane list/detail (Orders, back office) from tablet portrait width upwards.
 export const useTwoPane = () => useMediaQuery("(min-width: 768px)", true);

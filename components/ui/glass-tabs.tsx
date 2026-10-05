@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { ScrollRow } from "./scroll-row";
 
 export type GlassItem<T extends string> = { id: T; label: ReactNode; badge?: number; count?: ReactNode };
 
@@ -322,8 +323,8 @@ export function FilterChips<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="flex max-w-full overflow-x-auto">
+    <ScrollRow selected={value} className="flex max-w-full">
       <GlassTabs items={options.map((o) => ({ id: o.value, label: o.label, count: o.count }))} value={value} onChange={onChange} size="sm" />
-    </div>
+    </ScrollRow>
   );
 }

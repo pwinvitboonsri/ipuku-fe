@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { UNAUTHORIZED_EVENT, api } from "@/lib/api";
 import { CartProvider } from "@/lib/cart";
 import { clock } from "@/lib/format";
+import { usePhone } from "@/lib/orientation";
 import { qk, useCurrentShift, useOnline, useSession, useSignOut } from "@/lib/session";
 import { staffTone } from "@/lib/tone";
 import type { SessionStaff } from "@/lib/types";
@@ -61,6 +62,7 @@ function AppHeader({ user, shiftSince, onAccount }: { user: SessionStaff; shiftS
   const mode = pathname.startsWith("/backoffice") ? "bo" : "counter";
   const bare = pathname === "/open-shift";
   const counterTab = COUNTER_ROUTES.find((r) => pathname.startsWith(r)) ?? "/sell";
+  const phone = usePhone();
 
   const openOrders = useQuery({
     queryKey: qk.openOrders,
@@ -70,14 +72,18 @@ function AppHeader({ user, shiftSince, onAccount }: { user: SessionStaff; shiftS
   });
 
   return (
-    // One row on wide screens (as designed); below 1100px: [brand · account] then a scrollable tabs row.
-    <header className="flex shrink-0 flex-wrap items-center gap-x-3.5 gap-y-2 border-b border-line bg-paper px-3 py-2.5 sm:px-[18px] min-[1100px]:flex-nowrap min-[1100px]:py-3 short-land:flex-nowrap short-land:py-2">
+    // ≥1100px (and landscape phones): one row, as designed.
+    // 640–1099px: [brand · account] then [mode · counter tabs].
+    // Phone: [brand · mode · account] then the counter tabs sharing the full width.
+    // On a phone the tabs wrapper is display:contents so its two children can be placed on different rows.
+    <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2.5 border-b border-line bg-paper px-3 py-2.5 sm:gap-x-3.5 sm:px-[18px] min-[1100px]:flex-nowrap min-[1100px]:py-3 short-land:flex-nowrap short-land:py-2">
       <Brandmark small />
       {!bare && (
-        <div className="scroll order-3 -mx-3 flex w-[calc(100%+24px)] min-w-0 items-center gap-3.5 overflow-x-auto px-3 sm:-mx-[18px] sm:w-[calc(100%+36px)] sm:px-[18px] min-[1100px]:order-none min-[1100px]:mx-0 min-[1100px]:w-auto min-[1100px]:overflow-visible min-[1100px]:px-0 short-land:order-none short-land:mx-0 short-land:w-auto short-land:flex-1 short-land:px-0">
+        <div className="contents sm:order-4 sm:flex sm:w-full sm:min-w-0 sm:items-center sm:gap-3.5 sm:overflow-x-auto min-[1100px]:order-none min-[1100px]:w-auto min-[1100px]:overflow-visible short-land:order-none short-land:w-auto short-land:flex-1">
           {isOwner && (
-            <div className="shrink-0">
+            <div className="order-2 ml-auto shrink-0 sm:order-none sm:ml-0">
               <GlassTabs
+                size={phone ? "sm" : "md"}
                 value={mode}
                 onChange={(m) => router.push(m === "bo" ? "/backoffice" : "/sell")}
                 items={[
@@ -88,8 +94,9 @@ function AppHeader({ user, shiftSince, onAccount }: { user: SessionStaff; shiftS
             </div>
           )}
           {mode === "counter" && (
-            <nav className="shrink-0" style={{ marginLeft: isOwner ? 0 : 8 }}>
+            <nav className="order-4 w-full sm:order-none sm:w-auto sm:shrink-0" style={{ marginLeft: isOwner || phone ? 0 : 8 }}>
               <GlassTabs
+                full={phone}
                 value={counterTab}
                 onChange={(r) => router.push(r)}
                 items={[
@@ -103,7 +110,12 @@ function AppHeader({ user, shiftSince, onAccount }: { user: SessionStaff; shiftS
         </div>
       )}
       <div className="hidden flex-1 min-[1100px]:block" />
-      <button type="button" onClick={onAccount} aria-label="Account" className="tap ml-auto flex shrink-0 items-center gap-2.5 rounded-full bg-paper-2 p-1 sm:pr-2.5 min-[1100px]:ml-0 short-land:pr-1">
+      <button
+        type="button"
+        onClick={onAccount}
+        aria-label="Account"
+        className={`tap order-3 flex shrink-0 items-center gap-2.5 rounded-full bg-paper-2 p-1 sm:ml-auto sm:pr-2.5 min-[1100px]:order-none min-[1100px]:ml-0 short-land:order-none short-land:pr-1 ${isOwner && !bare ? "" : "ml-auto"}`}
+      >
         <div className="flex h-[30px] w-[30px] items-center justify-center rounded-full text-[13px] font-semibold text-paper" style={{ background: staffTone(user.id) }}>
           {user.name[0]}
         </div>
