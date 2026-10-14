@@ -4,6 +4,8 @@
 
 // Header the BFF sets on its own gateway errors, so an intentional 502 from NestJS isn't mistaken for an outage.
 export const UNREACHABLE_HEADER = "x-ipk-upstream";
+// Alongside it: the API's own /health URL, for the browser to wake a sleeping Render instance (see lib/api).
+export const WAKE_HEADER = "x-ipk-wake";
 
 let online = true;
 const listeners = new Set<() => void>();

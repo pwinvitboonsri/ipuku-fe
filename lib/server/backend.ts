@@ -1,7 +1,7 @@
 import "server-only";
 import { createHmac } from "node:crypto";
 import { headers as requestHeaders } from "next/headers";
-import { UNREACHABLE_HEADER } from "@/lib/connectivity";
+import { UNREACHABLE_HEADER, WAKE_HEADER } from "@/lib/connectivity";
 
 // Server-side access to the NestJS API. The browser never talks to NestJS directly:
 // the JWT lives in an httpOnly cookie and HMAC_SECRET never leaves the server.
@@ -29,6 +29,13 @@ function deviceSignature(method: string, pathAndQuery: string) {
 }
 
 const SIGNED_ROUTES = new Set(["GET /v1/auth"]);
+
+// Marks a response as "API unreachable" and says where the browser can wake it.
+// Render's free plan sleeps when idle, and requests from this Worker get an instant 502 without
+// waking it — but an ordinary request straight from the tablet does. The URL is the public API host.
+function unreachable() {
+  return { [UNREACHABLE_HEADER]: "1", [WAKE_HEADER]: `${baseUrl()}/health` };
+}
 
 // Every call reaches NestJS from this server, so the API would rate-limit the whole shop as one IP.
 // Pass the tablet's IP along, with BFF_KEY proving it came from us. cf-connecting-ip is set by
@@ -76,7 +83,7 @@ export async function callBackend(
       console.warn(`[api] ${method} ${pathAndQuery} → upstream ${res.status} (not JSON): API asleep, starting or down`);
       return Response.json(
         { statusCode: res.status, error: "Server unavailable", message: "The server is starting up — try again in a minute" },
-        { status: res.status, headers: { [UNREACHABLE_HEADER]: "1" } },
+        { status: res.status, headers: unreachable() },
       );
     }
     return res;
@@ -88,7 +95,7 @@ export async function callBackend(
         error: timedOut ? "Gateway Timeout" : "Bad Gateway",
         message: timedOut ? "The server took too long to respond" : "Can't reach the server",
       },
-      { status: timedOut ? 504 : 502, headers: { [UNREACHABLE_HEADER]: "1" } },
+      { status: timedOut ? 504 : 502, headers: unreachable() },
     );
   }
 }
@@ -101,6 +108,8 @@ export async function relay(upstream: Response): Promise<Response> {
   const retryAfter = upstream.headers.get("retry-after");
   if (retryAfter) headers.set("retry-after", retryAfter);
   if (upstream.headers.get(UNREACHABLE_HEADER)) headers.set(UNREACHABLE_HEADER, "1");
+  const wake = upstream.headers.get(WAKE_HEADER);
+  if (wake) headers.set(WAKE_HEADER, wake);
   return new Response(await upstream.arrayBuffer(), { status: upstream.status, headers });
 }
 

@@ -1,7 +1,7 @@
 // Browser API client. Every call goes through the Next backend-for-frontend (/api/v1/*),
 // which attaches the session token and forwards to NestJS /v1/*.
 
-import { UNREACHABLE_HEADER, connectivity } from "./connectivity";
+import { UNREACHABLE_HEADER, WAKE_HEADER, connectivity } from "./connectivity";
 
 export class ApiError extends Error {
   status: number;
@@ -57,6 +57,18 @@ function errorFrom(res: Response, body: unknown): ApiError {
   return new ApiError(res.status, messages, b.code, Number.isFinite(ra) && ra > 0 ? ra : undefined);
 }
 
+// Render's free plan sleeps when idle and doesn't wake for requests relayed by our Worker, but does
+// for a plain request from a browser. So when the BFF says the API is unreachable, ping its /health
+// straight from here. no-cors: we only need the request to land, not to read the answer.
+// At most once a minute — a waking instance holds the request open ~30 s anyway.
+const WAKE_EVERY_MS = 60_000;
+let lastWake = 0;
+function wakeApi(url: string | null) {
+  if (!url || !/^https:\/\//.test(url) || Date.now() - lastWake < WAKE_EVERY_MS) return;
+  lastWake = Date.now();
+  fetch(url, { mode: "no-cors", cache: "no-store", credentials: "omit" }).catch(() => {});
+}
+
 export async function request<T>(url: string, init?: RequestInit): Promise<Envelope<T>> {
   let res: Response;
   try {
@@ -65,8 +77,10 @@ export async function request<T>(url: string, init?: RequestInit): Promise<Envel
     connectivity.markOffline();
     throw new ApiError(0, ["Can't reach the server"]);
   }
-  if (res.headers.get(UNREACHABLE_HEADER)) connectivity.markOffline();
-  else connectivity.markOnline();
+  if (res.headers.get(UNREACHABLE_HEADER)) {
+    connectivity.markOffline();
+    wakeApi(res.headers.get(WAKE_HEADER));
+  } else connectivity.markOnline();
   const body = await parse(res);
   if (!res.ok) {
     // Token expired or revoked — the app shell listens for this and signs out.
