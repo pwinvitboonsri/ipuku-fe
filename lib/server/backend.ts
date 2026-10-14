@@ -62,13 +62,24 @@ export async function callBackend(
   }
 
   try {
-    return await fetch(url, {
+    const res = await fetch(url, {
       method,
       headers,
       body,
       cache: "no-store",
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
+    // Render answers with its own HTML 502/503 page while the API sleeps, wakes or restarts.
+    // That isn't NestJS speaking: report it as unreachable so the app shows the offline banner
+    // and polls /health, instead of printing the HTML as an error message.
+    if (res.status >= 502 && res.status <= 504 && !res.headers.get("content-type")?.includes("application/json")) {
+      console.warn(`[api] ${method} ${pathAndQuery} → upstream ${res.status} (not JSON): API asleep, starting or down`);
+      return Response.json(
+        { statusCode: res.status, error: "Server unavailable", message: "The server is starting up — try again in a minute" },
+        { status: res.status, headers: { [UNREACHABLE_HEADER]: "1" } },
+      );
+    }
+    return res;
   } catch (err) {
     const timedOut = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
     return Response.json(

@@ -40,7 +40,9 @@ async function parse(res: Response) {
   try {
     return JSON.parse(text);
   } catch {
-    return { message: text };
+    // An HTML error page (proxy / host) is never a message to show staff
+    if (/^\s*</.test(text)) return { message: `Server error (${res.status}) — try again in a minute` };
+    return { message: text.slice(0, 200) };
   }
 }
 
