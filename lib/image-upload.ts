@@ -2,8 +2,9 @@
 
 import { api } from "./api";
 
-// Product photos: resized on the device, then PUT straight to Cloudflare R2 with a URL
-// the backend signs (POST /product/image-upload). The file never goes through Next or Nest.
+// Images (product photos, receipt logo / bottom picture): resized on the device, then PUT straight
+// to Cloudflare R2 with a URL the backend signs (POST /product/image-upload). The file never goes
+// through Next or Nest.
 
 const MAX_SIDE = 800;
 const MAX_BYTES = 1_048_576; // matches the backend's limit
@@ -54,8 +55,8 @@ export async function resizeImage(file: File): Promise<Blob> {
   }
 }
 
-// Resize → sign → PUT to R2. Returns the public URL to save as the product's image_url.
-export async function uploadProductImage(file: File): Promise<string> {
+// Resize → sign → PUT to R2. Returns the public URL.
+export async function uploadImage(file: File): Promise<string> {
   log("picked", { name: file.name, type: file.type, bytes: file.size });
   const blob = await resizeImage(file);
   log("resized", { type: blob.type, bytes: blob.size });
@@ -90,3 +91,6 @@ export async function uploadProductImage(file: File): Promise<string> {
   log("uploaded", signed.public_url);
   return signed.public_url;
 }
+
+// Product photo → the URL to save as the product's image_url
+export const uploadProductImage = uploadImage;

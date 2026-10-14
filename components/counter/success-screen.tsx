@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { money, qty } from "@/lib/format";
 import { cashPayment, itemCount, paymentLabel, salePayments } from "@/lib/orders";
+import { printOrder } from "@/lib/print/print-order";
+import { usePrinterSettings } from "@/lib/print/settings";
+import { useStaffName } from "@/lib/session";
 import type { Order, StockAlert } from "@/lib/types";
 import { Pill } from "@/components/ui/bits";
 
@@ -60,6 +63,23 @@ export function SuccessScreen({ order, stockAlerts = [], onNextOrder }: { order:
   const split = sales.length > 1;
   const cash = cashPayment(order);
   const change = cash?.change_satang ?? 0;
+  const printer = usePrinterSettings();
+  const staffName = useStaffName();
+  const [printed, setPrinted] = useState(0);
+  const autoDone = useRef(false);
+
+  function print() {
+    printOrder(order, printer, staffName(order.staff_id));
+    setPrinted((n) => n + 1);
+  }
+
+  // Auto-print once, straight after the Confirm tap (Chrome only switches to RawBT shortly after a user gesture)
+  useEffect(() => {
+    if (autoDone.current || !printer.enabled || !printer.auto) return;
+    autoDone.current = true;
+    print();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per order
+  }, []);
 
   useEffect(() => {
     if (hold) return;
@@ -123,7 +143,16 @@ export function SuccessScreen({ order, stockAlerts = [], onNextOrder }: { order:
           )}
         </div>
         {hold && <StockAlertCard alerts={stockAlerts} />}
-        <div className="mt-2.5 text-[12px] text-muted">No receipt printing yet — call out the queue number.</div>
+        {printer.enabled ? (
+          <div className="mt-2.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[12.5px] text-muted">
+            <span>{printed ? "Sent to the printer." : "Not printed yet."}</span>
+            <button type="button" onClick={print} className="tap rounded-full border border-line-2 bg-card px-3.5 py-1.5 text-[13px] font-semibold text-ink">
+              {printed ? "Print again" : "Print receipt"}
+            </button>
+          </div>
+        ) : (
+          <div className="mt-2.5 text-[12px] text-muted">Receipt printing is off on this tablet — call out the queue number.</div>
+        )}
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line bg-paper px-4 pb-[18px] pt-3.5 sm:px-10">

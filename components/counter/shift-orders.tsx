@@ -8,6 +8,8 @@ import { useCart } from "@/lib/cart";
 import { clock, money } from "@/lib/format";
 import { STATUSES, methodLabel, orderKeys, orderSummary, paymentLabel, refundPayments, salePayments, statusLabel, useShiftOrders } from "@/lib/orders";
 import { useTwoPane } from "@/lib/orientation";
+import { printOrder } from "@/lib/print/print-order";
+import { usePrinterSettings } from "@/lib/print/settings";
 import { useCurrentShift, useSession, useStaffName } from "@/lib/session";
 import type { Order, OrderStatus } from "@/lib/types";
 import { Btn } from "@/components/ui/btn";
@@ -62,6 +64,12 @@ function OrderDetail({ o, isOwner, staff, onVoid, onRefund, onTakePayment }: { o
   const sales = salePayments(o);
   const refunds = refundPayments(o);
   const split = sales.length > 1;
+  const printer = usePrinterSettings();
+  const printBtn = printer.enabled && (
+    <Btn kind="secondary" onClick={() => printOrder(o, printer, staff)}>
+      Print receipt
+    </Btn>
+  );
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3 pb-3.5 pt-[18px] sm:px-5">
@@ -126,6 +134,7 @@ function OrderDetail({ o, isOwner, staff, onVoid, onRefund, onTakePayment }: { o
             </Btn>
           </>
         )}
+        {o.status === "PAID" && printBtn}
         {o.status === "PAID" &&
           (isOwner ? (
             <>

@@ -7,12 +7,15 @@ import { UNAUTHORIZED_EVENT, api } from "@/lib/api";
 import { CartProvider } from "@/lib/cart";
 import { clock } from "@/lib/format";
 import { usePhone } from "@/lib/orientation";
+import { decodePrintImage } from "@/lib/print/images";
+import { usePrinterSettings } from "@/lib/print/settings";
 import { qk, useCurrentShift, useOnline, useSession, useSignOut } from "@/lib/session";
 import { staffTone } from "@/lib/tone";
 import type { SessionStaff } from "@/lib/types";
 import { GlassTabs } from "@/components/ui/glass-tabs";
 import { Spinner } from "@/components/ui/bits";
 import { MyPinSheet } from "@/components/counter/my-pin-sheet";
+import { SettingsSheet } from "./settings-sheet";
 
 const IDLE_LOCK_MS = 5 * 60_000;
 const COUNTER_ROUTES = ["/sell", "/orders", "/close"];
@@ -39,13 +42,19 @@ function OfflineBanner() {
   );
 }
 
-function AccountMenu({ onClose, onMyPin, onSignOut }: { onClose: () => void; onMyPin: () => void; onSignOut: () => void }) {
+function AccountMenu({ onClose, onMyPin, onSettings, onSignOut }: { onClose: () => void; onMyPin: () => void; onSettings: () => void; onSignOut: () => void }) {
   const item = "tap w-full rounded-[8px] px-3.5 py-[11px] text-left text-[14px] font-medium";
   return (
     <div className="absolute inset-0 z-[35]" onClick={onClose}>
       <div className="modal-card absolute right-3 top-[52px] w-[220px] max-w-[calc(100%-24px)] rounded-[12px] border border-line bg-card p-1.5 shadow-lg sm:right-[18px]" onClick={(e) => e.stopPropagation()}>
         <button type="button" className={item} onClick={onMyPin}>
           Change my PIN
+        </button>
+        <button type="button" className={`${item} flex items-center justify-between`} onClick={onSettings}>
+          Settings
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" className="text-muted">
+            <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </button>
         <button type="button" className={`${item} text-persimmon-2`} onClick={onSignOut}>
           Sign out
@@ -157,7 +166,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   const signOut = useSignOut();
   const [account, setAccount] = useState(false);
   const [myPin, setMyPin] = useState(false);
+  const [settings, setSettings] = useState(false);
   useIdleLock(signOut);
+
+  // Receipt pictures are drawn right after the Pay tap, with no time to load — decode them up front
+  const printer = usePrinterSettings();
+  useEffect(() => {
+    decodePrintImage(printer.logo);
+    decodePrintImage(printer.bottom);
+  }, [printer.logo, printer.bottom]);
 
   // Any 401 from the API (expired token) or a missing session sends the tablet back to sign-in.
   useEffect(() => {
@@ -210,6 +227,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             setAccount(false);
             setMyPin(true);
           }}
+          onSettings={() => {
+            setAccount(false);
+            setSettings(true);
+          }}
           onSignOut={() => {
             setAccount(false);
             signOut();
@@ -217,6 +238,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         />
       )}
       {myPin && <MyPinSheet onClose={() => setMyPin(false)} />}
+      {settings && <SettingsSheet onClose={() => setSettings(false)} />}
     </div>
   );
 }
