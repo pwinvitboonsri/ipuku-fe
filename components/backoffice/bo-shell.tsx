@@ -7,7 +7,7 @@ import { useMediaQuery } from "@/lib/orientation";
 import { GlassTabs } from "@/components/ui/glass-tabs";
 import { ScrollRow } from "@/components/ui/scroll-row";
 
-const NAV = [
+export const BO_NAV = [
   { id: "/backoffice/menu", label: "Menu" },
   { id: "/backoffice/groups", label: "Option groups" },
   { id: "/backoffice/inventory", label: "Inventory" },
@@ -23,8 +23,8 @@ export function BackofficeShell({ children }: { children: ReactNode }) {
   const rail = useMediaQuery("(min-width: 1024px)", true);
   const ingredients = useIngredients();
   const low = ingredients.data?.filter((i) => i.is_active && i.stock_quantity <= i.reorder_level).length ?? 0;
-  const current = NAV.find((n) => pathname.startsWith(n.id))?.id ?? NAV[0].id;
-  const items = NAV.map((n) => ({ id: n.id, label: n.label, count: n.id === "/backoffice/inventory" && low ? `${low} low` : null }));
+  const current = BO_NAV.find((n) => pathname.startsWith(n.id))?.id ?? BO_NAV[0].id;
+  const items = BO_NAV.map((n) => ({ id: n.id, label: n.label, count: n.id === "/backoffice/inventory" && low ? `${low} low` : null }));
 
   return (
     <div className={`relative flex min-h-0 flex-1 ${rail ? "" : "flex-col"}`}>

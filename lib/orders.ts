@@ -12,10 +12,12 @@ export const orderKeys = {
 };
 
 // GET /order — this shift's orders (defaults to the open cash session), newest first.
+export const fetchShiftOrders = () => api.get<Order[]>("/order");
+
 export function useShiftOrders() {
   return useQuery({
     queryKey: orderKeys.shift,
-    queryFn: () => api.get<Order[]>("/order"),
+    queryFn: fetchShiftOrders,
     staleTime: 0,
   });
 }

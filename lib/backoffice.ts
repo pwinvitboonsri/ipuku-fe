@@ -21,18 +21,26 @@ export const bo = {
 const ALL = { include_inactive: true };
 const bySort = <T extends { sort_order: number; name: string }>(a: T, b: T) => a.sort_order - b.sort_order || a.name.localeCompare(b.name);
 
-export const useCategories = () =>
-  useQuery({ queryKey: bo.categories, queryFn: () => api.get<Category[]>("/category", ALL), select: (l) => [...l].sort(bySort) });
+// Fetchers shared by the hooks below and the warm-up prefetch (lib/warmup.ts), so both fill the same cache entries
+export const boFetch = {
+  categories: () => api.get<Category[]>("/category", ALL),
+  products: () => api.get<Product[]>("/product/list", ALL),
+  groups: () => api.get<ModifierGroupRow[]>("/modifier-group", ALL),
+  ingredients: () => api.get<Ingredient[]>("/ingredient", ALL),
+  staff: async () => (await api.get<{ staff: StaffRow[]; total: number }>("/auth/staff")).staff,
+};
+
+export const useCategories = () => useQuery({ queryKey: bo.categories, queryFn: boFetch.categories, select: (l) => [...l].sort(bySort) });
 export const useProducts = () =>
-  useQuery({ queryKey: bo.products, queryFn: () => api.get<Product[]>("/product/list", ALL), select: (l) => [...l].sort((a, b) => a.name.localeCompare(b.name)) });
+  useQuery({ queryKey: bo.products, queryFn: boFetch.products, select: (l) => [...l].sort((a, b) => a.name.localeCompare(b.name)) });
 export const useGroups = () =>
   useQuery({
     queryKey: bo.groups,
-    queryFn: () => api.get<ModifierGroupRow[]>("/modifier-group", ALL),
+    queryFn: boFetch.groups,
     select: (l) => l.map((g) => ({ ...g, modifier_option: [...g.modifier_option].sort(bySort) })),
   });
 export const useIngredients = () =>
-  useQuery({ queryKey: bo.ingredients, queryFn: () => api.get<Ingredient[]>("/ingredient", ALL), select: (l) => [...l].sort((a, b) => a.name.localeCompare(b.name)) });
+  useQuery({ queryKey: bo.ingredients, queryFn: boFetch.ingredients, select: (l) => [...l].sort((a, b) => a.name.localeCompare(b.name)) });
 export const useProductGroups = (productId: string) =>
   useQuery({ queryKey: bo.productGroups(productId), queryFn: () => api.get<ProductGroupLink[]>(`/product-modifier-group/product/${productId}`) });
 // GET /recipe/product/:id → { data: base lines, modifiers: product × option lines }
@@ -51,8 +59,7 @@ export const useMovements = (f: MovementFilter) => useQuery({ queryKey: bo.movem
 export const useShifts = (f: { before: string; after?: string }) =>
   useQuery({ queryKey: bo.shifts(f), queryFn: () => api.get<CashSession[]>("/cash-session", f) });
 
-export const useStaffAdmin = () =>
-  useQuery({ queryKey: bo.staff, queryFn: async () => (await api.get<{ staff: StaffRow[]; total: number }>("/auth/staff")).staff });
+export const useStaffAdmin = () => useQuery({ queryKey: bo.staff, queryFn: boFetch.staff });
 
 // A mutation that refreshes the given caches afterwards. Menu edits also refresh the counter's /menu.
 export function useBoMutation<V, R = unknown>(fn: (v: V) => Promise<R>, invalidate: QueryKey[], opts?: { onSuccess?: (r: R, v: V) => void }) {

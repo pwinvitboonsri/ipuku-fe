@@ -9,6 +9,8 @@ import { clock } from "@/lib/format";
 import { usePhone } from "@/lib/orientation";
 import { decodePrintImage } from "@/lib/print/images";
 import { usePrinterSettings } from "@/lib/print/settings";
+import { useWarmup } from "@/lib/warmup";
+import { BO_NAV } from "@/components/backoffice/bo-shell";
 import { qk, useCurrentShift, useOnline, useSession, useSignOut } from "@/lib/session";
 import { staffTone } from "@/lib/tone";
 import type { SessionStaff } from "@/lib/types";
@@ -168,6 +170,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [myPin, setMyPin] = useState(false);
   const [settings, setSettings] = useState(false);
   useIdleLock(signOut);
+
+  const isOwner = session.data?.role === "OWNER";
+  useWarmup(isOwner ? [...COUNTER_ROUTES, ...BO_NAV.map((n) => n.id)] : COUNTER_ROUTES, isOwner);
 
   // Receipt pictures are drawn right after the Pay tap, with no time to load — decode them up front
   const printer = usePrinterSettings();
