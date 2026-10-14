@@ -18,6 +18,7 @@ import { GlassTabs } from "@/components/ui/glass-tabs";
 import { Spinner } from "@/components/ui/bits";
 import { MyPinSheet } from "@/components/counter/my-pin-sheet";
 import { SettingsSheet } from "./settings-sheet";
+import { GrabAlarm } from "@/components/counter/grab-alarm";
 
 const IDLE_LOCK_MS = 5 * 60_000;
 const COUNTER_ROUTES = ["/sell", "/orders", "/close"];
@@ -220,6 +221,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="relative flex h-full flex-col bg-paper">
       <AppHeader user={session.data} shiftSince={opened ? clock(opened) : undefined} onAccount={() => setAccount((a) => !a)} />
       {!online && <OfflineBanner />}
+      {/* Grab orders only arrive while a shift is open */}
+      <GrabAlarm enabled={!!shift.data} />
       <CartProvider>
         <div key={pathname.startsWith("/backoffice") ? "bo" : pathname} className="screen-enter relative flex min-h-0 flex-1 flex-col">
           {children}

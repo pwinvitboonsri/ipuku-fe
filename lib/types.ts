@@ -35,7 +35,11 @@ export type MenuCategory = { id: string; name: string; products: MenuProduct[] }
 
 // ── Orders (order.entity.ts + orderInclude) ────────────────────────
 export type OrderStatus = "OPEN" | "PAID" | "VOIDED" | "REFUNDED";
-export type PaymentMethod = "CASH" | "PROMPTPAY";
+// GRAB: written by the Grab webhook only, settled by Grab later (never in the drawer)
+export type PaymentMethod = "CASH" | "PROMPTPAY" | "GRAB";
+export type OrderChannel = "WALK_IN" | "GRAB";
+// The Grab side of a GRAB order; acknowledged_at is set when someone taps "Got it"
+export type GrabOrderInfo = { grab_order_id: string; short_order_number: string; state: string; acknowledged_at: string | null };
 
 export type OrderItemModifier = { id: string; price_delta_satang: number; name_snapshot: string; modifier_option_id: string };
 export type OrderItem = {
@@ -62,6 +66,7 @@ export type Order = {
   id: string;
   order_number: number;
   status: OrderStatus;
+  channel: OrderChannel;
   subtotal_satang: number;
   discount_satang: number;
   total_satang: number;
@@ -72,6 +77,7 @@ export type Order = {
   create_at: string;
   order_item: OrderItem[];
   payment: Payment[];
+  grab_order: GrabOrderInfo | null;
 };
 
 // ── Back office (category / product / modifier / ingredient / recipe / stock-movement entities) ──

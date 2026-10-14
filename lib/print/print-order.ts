@@ -1,6 +1,6 @@
 "use client";
 
-import { cashPayment, orderLines, salePayments } from "@/lib/orders";
+import { cashPayment, grabTag, orderLines, salePayments } from "@/lib/orders";
 import type { Order } from "@/lib/types";
 import { printJob } from "./escpos";
 import { printImage } from "./images";
@@ -8,7 +8,7 @@ import { sendToRawbt } from "./rawbt";
 import { drawReceipt, drawTicket, type Receipt } from "./receipt";
 import { lines, type PrinterSettings } from "./settings";
 
-const THAI_METHOD = { CASH: "เงินสด", PROMPTPAY: "พร้อมเพย์" } as const;
+const THAI_METHOD = { CASH: "เงินสด", PROMPTPAY: "พร้อมเพย์", GRAB: "Grab" } as const;
 
 // Server order → slip content. Totals and change come from the server, never recomputed here.
 export function orderReceipt(o: Order, settings: PrinterSettings, staff?: string): Receipt {
@@ -17,6 +17,7 @@ export function orderReceipt(o: Order, settings: PrinterSettings, staff?: string
     shop: "Ippuku",
     header: lines(settings.header),
     queue: o.order_number,
+    tag: grabTag(o) ?? undefined,
     when: new Date(o.paid_at ?? o.create_at),
     staff,
     counter: "001",

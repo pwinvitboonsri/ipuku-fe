@@ -62,7 +62,8 @@ export const refundPayments = (o: Order): Payment[] => o.payment.filter((p) => p
 // At most one cash tender per order — the one that carries tendered / change.
 export const cashPayment = (o: Order): Payment | undefined => salePayments(o).find((p) => p.method === "CASH");
 
-export const methodLabel = (m?: string) => (m === "CASH" ? "Cash" : m === "PROMPTPAY" ? "PromptPay" : m === "MIXED" ? "Cash + PromptPay" : "—");
+const METHOD_LABEL: Record<string, string> = { CASH: "Cash", PROMPTPAY: "PromptPay", GRAB: "Grab", MIXED: "Cash + PromptPay" };
+export const methodLabel = (m?: string) => (m && METHOD_LABEL[m]) || "—";
 
 // "Cash", "PromptPay", "Cash + PromptPay", "PromptPay ×2"; "" when unpaid.
 export function paymentLabel(o: Order): string {
@@ -72,6 +73,11 @@ export function paymentLabel(o: Order): string {
   if (methods.length > 1) return methods.map(methodLabel).join(" + ");
   return methodLabel(methods[0]) + (rows.length > 1 ? ` ×${rows.length}` : "");
 }
+
+// "GRAB GF-123" for Grab orders, null for walk-ins
+export const grabTag = (o: Order) => (o.channel === "GRAB" ? `GRAB ${o.grab_order?.short_order_number ?? ""}`.trim() : null);
+// A Grab order nobody has tapped "Got it" on yet (cancelled ones no longer matter)
+export const needsAck = (o: Order) => o.channel === "GRAB" && o.status === "PAID" && !!o.grab_order && !o.grab_order.acknowledged_at;
 
 export const STATUSES: OrderStatus[] = ["OPEN", "PAID", "VOIDED", "REFUNDED"];
 export const statusLabel = (s: OrderStatus) => s[0] + s.slice(1).toLowerCase();

@@ -6,7 +6,8 @@ import { useState } from "react";
 import { api, errorText } from "@/lib/api";
 import { useCart } from "@/lib/cart";
 import { clock, money } from "@/lib/format";
-import { STATUSES, methodLabel, orderKeys, orderSummary, paymentLabel, refundPayments, salePayments, statusLabel, useShiftOrders } from "@/lib/orders";
+import { STATUSES, grabTag, methodLabel, needsAck, orderKeys, orderSummary, paymentLabel, refundPayments, salePayments, statusLabel, useShiftOrders } from "@/lib/orders";
+import { useAckGrab } from "@/lib/grab";
 import { useTwoPane } from "@/lib/orientation";
 import { printOrder } from "@/lib/print/print-order";
 import { usePrinterSettings } from "@/lib/print/settings";
@@ -22,6 +23,7 @@ type Filter = "ALL" | OrderStatus;
 function OrderRow({ o, on, staff, onTap }: { o: Order; on: boolean; staff?: string; onTap: () => void }) {
   const voided = o.status === "VOIDED";
   const paidBy = paymentLabel(o);
+  const grab = grabTag(o);
   return (
     <button
       type="button"
@@ -37,6 +39,12 @@ function OrderRow({ o, on, staff, onTap }: { o: Order; on: boolean; staff?: stri
       <span className={`mono text-[20px] font-semibold ${voided ? "text-muted" : "text-ink"}`}>#{o.order_number}</span>
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className={`truncate text-[14px] font-medium ${voided ? "text-muted line-through" : "text-ink"}`}>{orderSummary(o)}</span>
+        {grab && (
+          <span className="flex items-center gap-1.5">
+            <Pill tone="GRAB">{grab}</Pill>
+            {needsAck(o) && <span className="text-[11.5px] font-semibold text-persimmon-2">Not seen yet</span>}
+          </span>
+        )}
         <span className="text-[12px] text-muted">
           {clock(o.create_at)}
           {staff ? ` · ${staff}` : ""}
@@ -64,6 +72,8 @@ function OrderDetail({ o, isOwner, staff, onVoid, onRefund, onTakePayment }: { o
   const sales = salePayments(o);
   const refunds = refundPayments(o);
   const split = sales.length > 1;
+  const grab = grabTag(o);
+  const ack = useAckGrab();
   const printer = usePrinterSettings();
   const printBtn = printer.enabled && (
     <Btn kind="secondary" onClick={() => printOrder(o, printer, staff)}>
@@ -75,6 +85,7 @@ function OrderDetail({ o, isOwner, staff, onVoid, onRefund, onTakePayment }: { o
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3 pb-3.5 pt-[18px] sm:px-5">
         <span className="mono text-[28px] font-semibold">#{o.order_number}</span>
         <Pill tone={o.status}>{o.status}</Pill>
+        {grab && <Pill tone="GRAB">{grab}</Pill>}
         <span className="ml-auto text-[12.5px] text-muted">
           {clock(o.create_at)}
           {staff ? ` · ${staff}` : ""}
@@ -109,6 +120,8 @@ function OrderDetail({ o, isOwner, staff, onVoid, onRefund, onTakePayment }: { o
                     <KV k="Tendered" v={money(p.tender_satang ?? 0)} mono />
                     <KV k="Change" v={money(p.change_satang ?? 0)} mono />
                   </>
+                ) : p.method === "GRAB" ? (
+                  <KV k="Settled by" v="Grab (not in drawer)" />
                 ) : (
                   <KV k="Slip reference" v={p.reference || "—"} mono />
                 )}
@@ -134,8 +147,15 @@ function OrderDetail({ o, isOwner, staff, onVoid, onRefund, onTakePayment }: { o
             </Btn>
           </>
         )}
+        {needsAck(o) && (
+          <Btn kind="primary" disabled={ack.isPending} onClick={() => ack.mutate(o.id)}>
+            {ack.isPending ? "Saving…" : "Got it"}
+          </Btn>
+        )}
         {o.status === "PAID" && printBtn}
+        {o.status === "PAID" && grab && <span className="text-[12.5px] text-muted">Grab orders are cancelled and refunded through Grab.</span>}
         {o.status === "PAID" &&
+          !grab &&
           (isOwner ? (
             <>
               <Btn kind="dangerSoft" onClick={onRefund}>
@@ -164,7 +184,14 @@ export function ShiftOrders() {
   const twoPane = useTwoPane();
   const initial = (params.get("status") as Filter | null) ?? "ALL";
   const [filter, setFilter] = useState<Filter>(STATUSES.includes(initial as OrderStatus) ? initial : "ALL");
-  const [selId, setSelId] = useState<string | null>(null);
+  const [selId, setSelId] = useState<string | null>(params.get("highlight"));
+  // a tapped push notification lands here with ?highlight=<orderId> (also while already on this page)
+  const highlight = params.get("highlight");
+  const [seenHighlight, setSeenHighlight] = useState(highlight);
+  if (highlight !== seenHighlight) {
+    setSeenHighlight(highlight);
+    if (highlight) setSelId(highlight);
+  }
   const [sheet, setSheet] = useState<"void" | "refund" | null>(null);
 
   const act = useMutation({

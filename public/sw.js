@@ -2,8 +2,9 @@
 // - Never touches /api/*: orders, payments and sessions always go to the network.
 // - Hashed build assets (/_next/static) are cache-first; they never change for a given URL.
 // - Pages are network-first, falling back to the last copy, then to /offline.html.
+// - Shows Web Push alerts (new Grab orders) and opens the order when one is tapped.
 // Bump VERSION to drop old caches after a change to this file.
-const VERSION = "v1";
+const VERSION = "v2";
 const STATIC_CACHE = `ipk-static-${VERSION}`;
 const PAGE_CACHE = `ipk-pages-${VERSION}`;
 const PRECACHE = ["/offline.html", "/icons/icon-192.png", "/icons/icon-512.png"];
@@ -58,4 +59,39 @@ self.addEventListener("fetch", (event) => {
         .catch(() => caches.match(req).then((hit) => hit || caches.match("/offline.html"))),
     );
   }
+});
+
+// Payload from the API's PushService: { title, body, tag, url, requireInteraction }
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { title: "Ippuku", body: event.data ? event.data.text() : "" };
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || "Ippuku", {
+      body: data.body || "",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      tag: data.tag,
+      // same tag again (a re-alert) still buzzes instead of silently replacing
+      renotify: !!data.tag,
+      requireInteraction: !!data.requireInteraction,
+      vibrate: [300, 150, 300, 150, 600],
+      data: { url: data.url || "/sell" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || "/sell", self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
+      const open = wins.find((w) => new URL(w.url).origin === self.location.origin);
+      if (open) return open.focus().then((w) => (w || open).navigate(url));
+      return self.clients.openWindow(url);
+    }),
+  );
 });

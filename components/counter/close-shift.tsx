@@ -160,6 +160,8 @@ export function CloseShift() {
   const count = (s: string) => all.filter((o) => o.status === s).length;
   // every PromptPay row, refunds included (negative) — split orders count only their PromptPay part
   const promptpay = all.flatMap((o) => o.payment).filter((p) => p.method === "PROMPTPAY").reduce((s, p) => s + p.amount_satang, 0);
+  // Grab orders are paid to Grab, settled later
+  const grab = all.flatMap((o) => o.payment).filter((p) => p.method === "GRAB").reduce((s, p) => s + p.amount_satang, 0);
 
   return (
     <div className="flex min-h-0 flex-1 overflow-y-auto p-4 sm:p-6" data-screen-label="Close shift · count">
@@ -173,6 +175,7 @@ export function CloseShift() {
             <BRow k="Orders paid" v={count("PAID")} />
             <BRow k="Voided / refunded" v={`${count("VOIDED")} / ${count("REFUNDED")}`} />
             <BRow k="PromptPay (not in drawer)" v={money(promptpay)} />
+            {grab !== 0 && <BRow k="Grab (not in drawer)" v={money(grab)} />}
           </Card>
         </div>
         <div className="flex w-full max-w-[380px] flex-[1_1_300px] flex-col gap-2.5">

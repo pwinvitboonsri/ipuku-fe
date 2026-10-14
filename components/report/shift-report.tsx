@@ -162,7 +162,8 @@ export function ShiftReport({ report: r }: { report: Report }) {
       </Section>
 
       <Section title="Payments">
-        {r.tenders.map((t) => (
+        {/* the Grab line only once the shop takes Grab orders */}
+        {r.tenders.filter((t) => t.method !== "GRAB" || t.count || t.refunds_satang).map((t) => (
           <Row
             key={t.method}
             k={methodLabel(t.method)}

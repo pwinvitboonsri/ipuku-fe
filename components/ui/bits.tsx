@@ -15,6 +15,7 @@ const PILL_TONES = {
   STAFF: { bg: "var(--paper-3)", fg: "var(--ink-2)" },
   INACTIVE: { bg: "var(--paper-3)", fg: "var(--muted)" },
   neutral: { bg: "var(--paper-2)", fg: "var(--ink-2)" },
+  GRAB: { bg: "#00B14F", fg: "#FFFFFF" },
 } as const;
 export type PillTone = keyof typeof PILL_TONES;
 

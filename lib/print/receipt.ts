@@ -12,6 +12,7 @@ export type Receipt = {
   shop: string;
   header?: string[]; // branch, address, phone, tax ID…
   queue: number;
+  tag?: string; // e.g. "GRAB GF-123": printed big under the queue number so the bar packs it for the rider
   when: Date;
   staff?: string;
   counter?: string;
@@ -215,6 +216,7 @@ function dither(g: CanvasRenderingContext2D, x: number, y: number, w: number, h:
 export function drawTicket(r: Receipt, paper: PaperWidth = 80): HTMLCanvasElement {
   const p = new Pen(paper);
   p.center(`คิวที่ ${r.queue}`, 56, { weight: 800 });
+  if (r.tag) p.center(r.tag, 40, { weight: 800 });
   p.gap(2);
   p.row(when(r.when), r.staff ? `พนักงาน: ${r.staff}` : null, 20, { family: p.f.mono });
   p.rule();
@@ -239,7 +241,7 @@ export function drawReceipt(r: Receipt, paper: PaperWidth = 80, images: ReceiptI
   p.rule();
 
   p.row(`วันที่: ${when(r.when)}`, null, 20, mono);
-  p.row(`Order #${r.queue}`, null, 20, mono);
+  p.row(`Order #${r.queue}`, r.tag ?? null, 20, mono);
   p.row(r.counter ? `POS: ${r.counter}` : "", r.staff ? `พนักงาน: ${r.staff}` : null, 20, mono);
   p.rule();
 
