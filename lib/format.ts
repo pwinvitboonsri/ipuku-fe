@@ -35,6 +35,12 @@ export function shortDate(iso?: string | null): string {
   return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
 }
 
+// "Mon 20 Oct · 14:05" — orders can be looked at long after the day they were rung up
+export function dateTime(iso?: string | null): string {
+  if (!iso || Number.isNaN(new Date(iso).getTime())) return "—";
+  return `${shortDate(iso)} · ${clock(iso)}`;
+}
+
 export function firstName(name: string): string {
   return name.split(" ")[0];
 }

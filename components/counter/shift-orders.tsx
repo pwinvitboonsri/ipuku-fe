@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { api, errorText } from "@/lib/api";
 import { useCart } from "@/lib/cart";
-import { clock, money } from "@/lib/format";
+import { dateTime, money } from "@/lib/format";
 import { STATUSES, methodLabel, orderKeys, orderSummary, paymentLabel, refundPayments, salePayments, statusLabel, useShiftOrders } from "@/lib/orders";
 import { useTwoPane } from "@/lib/orientation";
 import { printOrder } from "@/lib/print/print-order";
@@ -38,7 +38,7 @@ function OrderRow({ o, on, staff, onTap }: { o: Order; on: boolean; staff?: stri
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className={`truncate text-[14px] font-medium ${voided ? "text-muted line-through" : "text-ink"}`}>{orderSummary(o)}</span>
         <span className="text-[12px] text-muted">
-          {clock(o.create_at)}
+          {dateTime(o.create_at)}
           {staff ? ` · ${staff}` : ""}
           {paidBy ? ` · ${paidBy}` : ""}
         </span>
@@ -76,7 +76,7 @@ function OrderDetail({ o, isOwner, staff, onVoid, onRefund, onTakePayment }: { o
         <span className="mono text-[28px] font-semibold">#{o.order_number}</span>
         <Pill tone={o.status}>{o.status}</Pill>
         <span className="ml-auto text-[12.5px] text-muted">
-          {clock(o.create_at)}
+          {dateTime(o.create_at)}
           {staff ? ` · ${staff}` : ""}
         </span>
       </div>
@@ -115,7 +115,7 @@ function OrderDetail({ o, isOwner, staff, onVoid, onRefund, onTakePayment }: { o
               </div>
             ))}
             {refunds.map((r) => (
-              <KV key={r.id} k={split ? `Refunded · ${methodLabel(r.method)}` : "Refunded"} v={`${money(r.amount_satang)} · ${clock(r.create_at)}`} mono />
+              <KV key={r.id} k={split ? `Refunded · ${methodLabel(r.method)}` : "Refunded"} v={`${money(r.amount_satang)} · ${dateTime(r.create_at)}`} mono />
             ))}
           </Card>
         )}
@@ -198,7 +198,7 @@ export function ShiftOrders() {
   const showList = twoPane || !sel;
   const showDetail = twoPane || !!sel;
   const opener = staffName(shift.data?.opened_by_staff_id);
-  const sub = shift.data ? `Opened ${clock(shift.data.open_at)}${opener ? ` by ${opener}` : ""} · newest first` : "Newest first";
+  const sub = shift.data ? `Opened ${dateTime(shift.data.open_at)}${opener ? ` by ${opener}` : ""} · newest first` : "Newest first";
 
   return (
     <div className="relative grid min-h-0 flex-1" style={{ gridTemplateColumns: twoPane ? "minmax(0,1fr) minmax(0,1fr)" : "minmax(0,1fr)" }} data-screen-label="Shift orders">
