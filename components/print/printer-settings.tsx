@@ -4,14 +4,15 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { errorText } from "@/lib/api";
 import { escpos, printJob, type PaperWidth } from "@/lib/print/escpos";
 import { decodePrintImage, preparePrintImage } from "@/lib/print/images";
-import { renderSlips } from "@/lib/print/print-order";
-import { sendToRawbt, type RawbtMode } from "@/lib/print/rawbt";
+import { renderSlips, sendSlips } from "@/lib/print/print-order";
+import type { RawbtMode } from "@/lib/print/rawbt";
 import type { Receipt } from "@/lib/print/receipt";
 import { lines, savePrinterSettings, usePrinterSettings, type PrintImage } from "@/lib/print/settings";
 import { Btn } from "@/components/ui/btn";
 import { ErrorNote, Spinner, Toggle, labelCls } from "@/components/ui/bits";
 import { Field, inputCls } from "@/components/ui/form";
 import { Segmented } from "@/components/ui/glass-tabs";
+import { RawbtPrinterPicker } from "./rawbt-printer-picker";
 
 // Sample with the Thai that usually breaks on printers: stacked vowels + tone marks (ปู่ ผู้ ฟ้า น้ำ).
 const SAMPLE: Omit<Receipt, "header" | "footer"> = {
@@ -131,9 +132,14 @@ export function PrinterSettings() {
     };
   }, [s]);
 
-  function send(label: string, bytes: Uint8Array) {
-    setSent(`${label} · ${bytes.length.toLocaleString()} bytes · sent ${new Date().toLocaleTimeString("en-GB", { hour12: false })}`);
-    sendToRawbt(bytes, s.mode);
+  async function send(label: string, bytes: Uint8Array) {
+    const at = new Date().toLocaleTimeString("en-GB", { hour12: false });
+    try {
+      await sendSlips(bytes, s);
+      setSent(`${label} · ${bytes.length.toLocaleString()} bytes · sent ${at}`);
+    } catch (err) {
+      setSent(`${label} · failed ${at} · ${errorText(err)}`);
+    }
   }
 
   function textOnly() {
@@ -148,9 +154,12 @@ export function PrinterSettings() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div>
-        <div className={labelCls}>Receipt printer</div>
-        <div className="mt-1 text-[12.5px] leading-[1.45] text-muted">Prints through the RawBT app paired with the Bluetooth printer. Saved on this tablet only.</div>
+      <div className="text-[12.5px] leading-[1.45] text-muted">Ticket and customer receipt. Prints through the RawBT app paired with the Bluetooth printer. Saved on this tablet only.</div>
+
+      <div className="flex flex-col gap-1.5 rounded-[14px] border border-line bg-card p-4">
+        <div className="text-[14px] font-medium text-ink">Print to</div>
+        <RawbtPrinterPicker value={s.printer} onChange={(printer) => savePrinterSettings({ printer })} emptyLabel="Printer ticked in RawBT" />
+        <div className="text-[12px] leading-[1.4] text-muted">Pick the slip printer by name so stickers can use another one. Needs the “Server for RawBT” app running.</div>
       </div>
 
       <div className="rounded-[14px] border border-line bg-card p-4">
@@ -174,11 +183,13 @@ export function PrinterSettings() {
             <Segmented size="sm" value={String(s.paper) as "80" | "58"} onChange={(v) => savePrinterSettings({ paper: Number(v) as PaperWidth })} options={[{ value: "80", label: "80 mm" }, { value: "58", label: "58 mm" }]} />
           </div>
         </SettingRow>
-        <SettingRow label="RawBT link" hint="Switch to “rawbt:” only if RawBT doesn't open.">
-          <div className="w-[160px]">
-            <Segmented size="sm" value={s.mode} onChange={(v: RawbtMode) => savePrinterSettings({ mode: v })} options={[{ value: "intent", label: "Default" }, { value: "scheme", label: "rawbt:" }]} />
-          </div>
-        </SettingRow>
+        {!s.printer && (
+          <SettingRow label="RawBT link" hint="Switch to “rawbt:” only if RawBT doesn't open.">
+            <div className="w-[160px]">
+              <Segmented size="sm" value={s.mode} onChange={(v: RawbtMode) => savePrinterSettings({ mode: v })} options={[{ value: "intent", label: "Default" }, { value: "scheme", label: "rawbt:" }]} />
+            </div>
+          </SettingRow>
+        )}
       </div>
 
       <div className="flex flex-col gap-3.5 rounded-[14px] border border-line bg-card p-4">
@@ -201,7 +212,7 @@ export function PrinterSettings() {
           Text only
         </Btn>
       </div>
-      {sent && <div className="mono rounded-[10px] bg-paper-2 px-3 py-2 text-[12px] text-ink-2">{sent}</div>}
+      {sent && <div className="mono break-words rounded-[10px] bg-paper-2 px-3 py-2 text-[12px] text-ink-2">{sent}</div>}
 
       <div className="flex items-center gap-2">
         <span className={labelCls}>Preview</span>

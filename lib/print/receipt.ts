@@ -34,7 +34,7 @@ function appFont(cssVar: string, fallback: string) {
 }
 
 // App face first so Latin/digits use it; Thai glyphs fall through to the Thai stack
-function families() {
+export function families() {
   return {
     sans: `${appFont("--font-dm-sans", "system-ui")}, ${THAI}, sans-serif`,
     mono: `${appFont("--font-jetbrains", "ui-monospace")}, ${THAI}, monospace`,
@@ -45,6 +45,24 @@ function families() {
 const when = (d: Date) =>
   `${d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })} ${d.toLocaleTimeString("en-GB", { hour12: false })}`;
 
+// Breaks text into lines that fit maxW in the context's current font.
+// Splits on words, not spaces: Thai has no spaces between words.
+const segmenter = typeof Intl !== "undefined" && "Segmenter" in Intl ? new Intl.Segmenter("th", { granularity: "word" }) : null;
+export function wrapText(g: CanvasRenderingContext2D, text: string, maxW: number): string[] {
+  const out: string[] = [];
+  let cur = "";
+  const parts = segmenter ? Array.from(segmenter.segment(text), (s) => s.segment) : text.split(/(?<=\s)/);
+  for (const segment of parts) {
+    const next = cur + segment;
+    if (cur && g.measureText(next).width > maxW) {
+      out.push(cur.trimEnd());
+      cur = segment.trimStart();
+    } else cur = next;
+  }
+  if (cur) out.push(cur);
+  return out.length ? out : [""];
+}
+
 // Small layout helper: a tall white scratch canvas, a y cursor, and text/rule/image primitives.
 class Pen {
   readonly W: number;
@@ -53,7 +71,6 @@ class Pen {
   y: number;
   private c = document.createElement("canvas");
   private g: CanvasRenderingContext2D;
-  private seg = new Intl.Segmenter("th", { granularity: "word" }); // Thai has no spaces between words
   readonly f = families();
 
   constructor(paper: PaperWidth) {
@@ -77,19 +94,7 @@ class Pen {
   private lineH = (size: number) => this.px(size * 1.42); // room for Thai upper/lower marks
   private base = (size: number) => this.y - this.px(size * 0.34);
 
-  private wrap(text: string, maxW: number): string[] {
-    const out: string[] = [];
-    let cur = "";
-    for (const { segment } of this.seg.segment(text)) {
-      const next = cur + segment;
-      if (cur && this.g.measureText(next).width > maxW) {
-        out.push(cur.trimEnd());
-        cur = segment.trimStart();
-      } else cur = next;
-    }
-    if (cur) out.push(cur);
-    return out.length ? out : [""];
-  }
+  private wrap = (text: string, maxW: number) => wrapText(this.g, text, maxW);
 
   center(text: string, size: number, { family = this.f.sans, weight = 500, italic = false } = {}) {
     this.font(family, size, weight, italic);

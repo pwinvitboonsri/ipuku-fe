@@ -5,8 +5,11 @@ import type { Order } from "@/lib/types";
 import { printJob } from "./escpos";
 import { printImage } from "./images";
 import { sendToRawbt } from "./rawbt";
+import { printOnRawbt } from "./rawbt-ws";
 import { drawReceipt, drawTicket, type Receipt } from "./receipt";
 import { lines, type PrinterSettings } from "./settings";
+import { drawSticker, orderStickers, stickerJob } from "./sticker";
+import type { StickerSettings } from "./sticker-settings";
 
 const THAI_METHOD = { CASH: "เงินสด", PROMPTPAY: "พร้อมเพย์" } as const;
 
@@ -41,10 +44,24 @@ export function renderSlips(r: Receipt, settings: PrinterSettings, only?: "ticke
   return slips;
 }
 
-// Render + hand to RawBT. Call from a tap (or right after one): Chrome only opens another app on a user gesture.
-export function printOrder(o: Order, settings: PrinterSettings, staff?: string, only?: "ticket" | "receipt") {
+// Slips go by name through RawBT's local server when a printer is chosen; otherwise through
+// the rawbt: link to whichever printer is ticked in RawBT (that one needs a user gesture).
+export async function sendSlips(bytes: Uint8Array, settings: PrinterSettings) {
+  if (settings.printer) await printOnRawbt(settings.printer, bytes);
+  else sendToRawbt(bytes, settings.mode);
+}
+
+// Render + send. Call from a tap (or right after one) in case the link is used.
+export async function printOrder(o: Order, settings: PrinterSettings, staff?: string, only?: "ticket" | "receipt") {
   const slips = renderSlips(orderReceipt(o, settings, staff), settings, only);
-  if (slips.length) sendToRawbt(printJob(slips, { cut: settings.cut }), settings.mode);
+  if (slips.length) await sendSlips(printJob(slips, { cut: settings.cut }), settings);
   return slips.length;
 }
 
+// One sticker per cup, to the sticker printer by name.
+export async function printStickers(o: Order, sticker: StickerSettings) {
+  if (!sticker.printer) throw new Error("Choose the sticker printer in Settings → Sticker printer");
+  const canvases = orderStickers(o).map((d) => drawSticker(d, sticker).canvas);
+  if (canvases.length) await printOnRawbt(sticker.printer, stickerJob(canvases, sticker));
+  return canvases.length;
+}

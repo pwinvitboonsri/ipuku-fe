@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { localStore } from "./local-store";
 import type { PaperWidth } from "./escpos";
 import type { RawbtMode } from "./rawbt";
 
@@ -16,7 +16,8 @@ export type PrinterSettings = {
   receipt: boolean; // customer receipt
   paper: PaperWidth;
   cut: boolean;
-  mode: RawbtMode;
+  printer: string; // RawBT printer name; "" = whichever printer is ticked in RawBT (via the link)
+  mode: RawbtMode; // link form, used only when printer is ""
   header: string; // lines under the shop name (branch, address, phone, tax ID), one per line
   footer: string; // closing lines, one per line
   logo: PrintImage | null;
@@ -30,6 +31,7 @@ export const DEFAULT_PRINTER: PrinterSettings = {
   receipt: true,
   paper: 80,
   cut: true,
+  printer: "",
   mode: "intent",
   header: "",
   footer: "THANK YOU\nENJOY YOUR DAY ♡",
@@ -37,41 +39,9 @@ export const DEFAULT_PRINTER: PrinterSettings = {
   bottom: null,
 };
 
-const KEY = "ipk_printer_v1";
-const listeners = new Set<() => void>();
-let cached: PrinterSettings | null = null;
-
-function read(): PrinterSettings {
-  if (cached) return cached;
-  try {
-    const raw = localStorage.getItem(KEY);
-    cached = raw ? { ...DEFAULT_PRINTER, ...JSON.parse(raw) } : DEFAULT_PRINTER;
-  } catch {
-    cached = DEFAULT_PRINTER;
-  }
-  return cached!;
-}
-
-export function savePrinterSettings(patch: Partial<PrinterSettings>) {
-  cached = { ...read(), ...patch };
-  try {
-    localStorage.setItem(KEY, JSON.stringify(cached));
-  } catch {
-    // private mode / storage full: keep the settings for this session only
-  }
-  listeners.forEach((l) => l());
-}
-
-export function usePrinterSettings(): PrinterSettings {
-  return useSyncExternalStore(
-    (cb) => {
-      listeners.add(cb);
-      return () => listeners.delete(cb);
-    },
-    read,
-    () => DEFAULT_PRINTER,
-  );
-}
+const store = localStore("ipk_printer_v1", DEFAULT_PRINTER);
+export const savePrinterSettings = store.save;
+export const usePrinterSettings = store.use;
 
 export const lines = (text: string) =>
   text

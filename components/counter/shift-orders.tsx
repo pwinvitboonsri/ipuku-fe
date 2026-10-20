@@ -8,8 +8,7 @@ import { useCart } from "@/lib/cart";
 import { dateTime, money } from "@/lib/format";
 import { STATUSES, methodLabel, orderKeys, orderSummary, paymentLabel, refundPayments, salePayments, statusLabel, useShiftOrders } from "@/lib/orders";
 import { useTwoPane } from "@/lib/orientation";
-import { printOrder } from "@/lib/print/print-order";
-import { usePrinterSettings } from "@/lib/print/settings";
+import { usePrintOrder } from "@/lib/print/use-print";
 import { useCurrentShift, useSession, useStaffName } from "@/lib/session";
 import type { Order, OrderStatus } from "@/lib/types";
 import { Btn } from "@/components/ui/btn";
@@ -64,11 +63,21 @@ function OrderDetail({ o, isOwner, staff, onVoid, onRefund, onTakePayment }: { o
   const sales = salePayments(o);
   const refunds = refundPayments(o);
   const split = sales.length > 1;
-  const printer = usePrinterSettings();
-  const printBtn = printer.enabled && (
-    <Btn kind="secondary" onClick={() => printOrder(o, printer, staff)}>
-      Print receipt
-    </Btn>
+  const { printer, sticker, status, busy, print } = usePrintOrder(o, staff);
+  const printBtn = (
+    <>
+      {printer.enabled && (
+        <Btn kind="secondary" disabled={busy} onClick={() => print({ slips: true, stickers: false })}>
+          Print receipt
+        </Btn>
+      )}
+      {sticker.enabled && (
+        <Btn kind="secondary" disabled={busy} onClick={() => print({ slips: false, stickers: true })}>
+          Print stickers
+        </Btn>
+      )}
+      {(busy || status) && <span className={`text-[12px] ${status?.error && !busy ? "font-medium text-persimmon-2" : "text-muted"}`}>{busy ? "Printing…" : status?.text}</span>}
+    </>
   );
   return (
     <div className="flex h-full min-h-0 flex-col">

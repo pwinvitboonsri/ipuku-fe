@@ -3,8 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { money, qty } from "@/lib/format";
 import { cashPayment, itemCount, paymentLabel, salePayments } from "@/lib/orders";
-import { printOrder } from "@/lib/print/print-order";
-import { usePrinterSettings } from "@/lib/print/settings";
+import { usePrintOrder } from "@/lib/print/use-print";
 import { useStaffName } from "@/lib/session";
 import type { Order, StockAlert } from "@/lib/types";
 import { Pill } from "@/components/ui/bits";
@@ -63,33 +62,29 @@ export function SuccessScreen({ order, stockAlerts = [], onNextOrder }: { order:
   const split = sales.length > 1;
   const cash = cashPayment(order);
   const change = cash?.change_satang ?? 0;
-  const printer = usePrinterSettings();
   const staffName = useStaffName();
-  const [printed, setPrinted] = useState(0);
+  const { printer, sticker, status, busy, print } = usePrintOrder(order, staffName(order.staff_id));
   const autoDone = useRef(false);
-
-  function print() {
-    printOrder(order, printer, staffName(order.staff_id));
-    setPrinted((n) => n + 1);
-  }
 
   // Auto-print once, straight after the Confirm tap (Chrome only switches to RawBT shortly after a user gesture)
   useEffect(() => {
-    if (autoDone.current || !printer.enabled || !printer.auto) return;
+    if (autoDone.current) return;
     autoDone.current = true;
-    print();
+    print({ slips: printer.auto, stickers: sticker.auto });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per order
   }, []);
 
+  // A print error also holds the screen, so staff see it and can retry
+  const wait = hold || !!status?.error;
   useEffect(() => {
-    if (hold) return;
+    if (wait) return;
     if (countdown <= 0) {
       onNextOrder();
       return;
     }
     const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
     return () => clearTimeout(t);
-  }, [hold, countdown, onNextOrder]);
+  }, [wait, countdown, onNextOrder]);
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col bg-paper" data-screen-label="Payment success">
@@ -143,12 +138,19 @@ export function SuccessScreen({ order, stockAlerts = [], onNextOrder }: { order:
           )}
         </div>
         {hold && <StockAlertCard alerts={stockAlerts} />}
-        {printer.enabled ? (
+        {printer.enabled || sticker.enabled ? (
           <div className="mt-2.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[12.5px] text-muted">
-            <span>{printed ? "Sent to the printer." : "Not printed yet."}</span>
-            <button type="button" onClick={print} className="tap rounded-full border border-line-2 bg-card px-3.5 py-1.5 text-[13px] font-semibold text-ink">
-              {printed ? "Print again" : "Print receipt"}
-            </button>
+            <span className={status?.error ? "font-medium text-persimmon-2" : ""}>{busy ? "Printing…" : (status?.text ?? "Not printed yet.")}</span>
+            {printer.enabled && (
+              <button type="button" disabled={busy} onClick={() => print({ slips: true, stickers: false })} className="tap rounded-full border border-line-2 bg-card px-3.5 py-1.5 text-[13px] font-semibold text-ink">
+                Print receipt
+              </button>
+            )}
+            {sticker.enabled && (
+              <button type="button" disabled={busy} onClick={() => print({ slips: false, stickers: true })} className="tap rounded-full border border-line-2 bg-card px-3.5 py-1.5 text-[13px] font-semibold text-ink">
+                Print stickers
+              </button>
+            )}
           </div>
         ) : (
           <div className="mt-2.5 text-[12px] text-muted">Receipt printing is off on this tablet — call out the queue number.</div>
@@ -156,7 +158,7 @@ export function SuccessScreen({ order, stockAlerts = [], onNextOrder }: { order:
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line bg-paper px-4 pb-[18px] pt-3.5 sm:px-10">
-        <div className="mono whitespace-nowrap text-[13px] text-muted">{hold ? "Read the stock alert above" : `Next order in ${countdown}s…`}</div>
+        <div className="mono whitespace-nowrap text-[13px] text-muted">{hold ? "Read the stock alert above" : wait ? "Check the printer above" : `Next order in ${countdown}s…`}</div>
         <button type="button" onClick={onNextOrder} className="tap flex items-center gap-2.5 whitespace-nowrap rounded-[12px] bg-ink px-[22px] py-3.5 text-[14px] font-semibold text-paper">
           Start next order
           <svg width="16" height="12" viewBox="0 0 18 14" fill="none">
