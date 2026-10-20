@@ -8,11 +8,31 @@ const STATIC_CACHE = `ipk-static-${VERSION}`;
 const PAGE_CACHE = `ipk-pages-${VERSION}`;
 const PRECACHE = ["/offline.html", "/icons/icon-192.png", "/icons/icon-512.png"];
 
+// A dev/LAN address (next dev, or `next start` on the Mac). Dev chunk names don't change with their
+// content, so cache-first would keep serving old code — and a crash in that old code stops the app
+// from ever unregistering us. Here the worker removes itself instead, then reloads open pages.
+const LOCAL = /^(localhost|\[::1\])$|^(127|10)\.\d|^192\.168\.\d|\.local$/.test(self.location.hostname);
+
 self.addEventListener("install", (event) => {
+  if (LOCAL) {
+    event.waitUntil(self.skipWaiting());
+    return;
+  }
   event.waitUntil(caches.open(STATIC_CACHE).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (event) => {
+  if (LOCAL) {
+    event.waitUntil(
+      caches
+        .keys()
+        .then((keys) => Promise.all(keys.filter((k) => k.startsWith("ipk-")).map((k) => caches.delete(k))))
+        .then(() => self.registration.unregister())
+        .then(() => self.clients.matchAll({ type: "window" }))
+        .then((wins) => wins.forEach((w) => w.navigate(w.url).catch(() => {}))),
+    );
+    return;
+  }
   event.waitUntil(
     caches
       .keys()
@@ -22,6 +42,7 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  if (LOCAL) return; // straight to the network
   const req = event.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
