@@ -72,6 +72,72 @@ export type Order = {
   create_at: string;
   order_item: OrderItem[];
   payment: Payment[];
+  // loyalty (ipuku-be loyalty-order.service.ts → withClaimUrl, order.include.ts)
+  claim_token?: ClaimTokenInfo | null;
+  reward_code?: OrderRewardInfo | null;
+};
+
+type MemberRef = { member_no: number; display_name: string | null };
+// "Scan to collect points" QR for a paid walk-in order; url is null until LINE is set up on the API
+export type ClaimTokenInfo = { code: string; display_code: string; points: number; expires_at: string; claimed_at: string | null; member: MemberRef | null; url: string | null };
+export type RewardCodeStatus = "ACTIVE" | "APPLIED" | "USED" | "CANCELLED";
+export type OrderRewardInfo = { code: string; status: RewardCodeStatus; reward_name: string; cost_points: number; discount_satang: number | null; member: MemberRef };
+
+// POST /loyalty/reward-codes/validate
+export type RewardType = "FIXED_DISCOUNT" | "FREE_ITEM";
+export type ValidatedReward = {
+  code: string;
+  reward_name: string;
+  cost_points: number;
+  type: RewardType;
+  discount_satang: number | null;
+  max_discount_satang: number | null;
+  product: { id: string; name: string } | null;
+  expires_at: string;
+  member: { label: string; display_name: string | null };
+};
+
+// ── Back office → Loyalty (/loyalty/admin/*)
+export type LoyaltyProgram = {
+  points_per_unit: number;
+  unit_satang: number;
+  claim_valid_hours: number;
+  reward_code_minutes: number;
+  consent_version: string;
+  update_at: string;
+  claim_qr_enabled: boolean;
+};
+export type RewardRow = {
+  id: string;
+  name: string;
+  cost_points: number;
+  type: RewardType;
+  discount_satang: number | null;
+  max_discount_satang: number | null;
+  sort_order: number;
+  is_active: boolean;
+  product: { id: string; name: string; price_satang: number } | null;
+};
+export type LoyaltyMember = {
+  id: string;
+  label: string;
+  display_name: string | null;
+  picture_url: string | null;
+  balance: number;
+  visits: number;
+  last_visit_at: string | null;
+  joined_at: string;
+};
+export type PointsEntryType = "EARN" | "REDEEM" | "REVERSAL";
+export type PointsActivity = {
+  id: string;
+  type: PointsEntryType;
+  points: number;
+  note: string | null;
+  create_at: string;
+  member: { id: string; label: string; display_name: string | null };
+  order_number: number | null;
+  by: string;
 };
 
 // ── Back office (category / product / modifier / ingredient / recipe / stock-movement entities) ──

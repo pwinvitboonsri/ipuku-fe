@@ -84,6 +84,30 @@ const LockIcon = () => (
   </svg>
 );
 
+// LINE reward on this order: a locked discount line set by the reward (preview in the cart, server's on the order)
+export type PanelReward = { name: string; member: string; memberLabel: string; discount: number | null; product?: string | null };
+
+function RewardLine({ reward, onRemove }: { reward: PanelReward; onRemove?: () => void }) {
+  return (
+    <div className="line-in mx-3 flex items-start justify-between gap-3 border-b border-line py-2.5 text-matcha">
+      <div className="min-w-0">
+        <div className="text-[14px] font-semibold">Reward · {reward.name}</div>
+        <div className="text-[11.5px] text-muted">
+          {reward.discount === null ? <span className="font-medium text-persimmon-2">Add {reward.product ?? "the item"} to use this reward</span> : "Locked · set by reward, not editable"}
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <span className="mono text-[14px] font-semibold">{reward.discount === null ? "—" : `−${money(reward.discount)}`}</span>
+        {onRemove && (
+          <button type="button" aria-label="Remove reward" onClick={onRemove} className="tap flex h-7 w-7 items-center justify-center rounded-full bg-paper-2 text-[14px] text-ink-2">
+            ×
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Cart (editable) or a server order (locked, during payment). Locked totals come from the server.
 export function OrderPanel({
   lines,
@@ -95,6 +119,9 @@ export function OrderPanel({
   onRemove,
   onClear,
   onPay,
+  reward,
+  onScanReward,
+  onRemoveReward,
 }: {
   lines: DisplayLine[];
   total: number;
@@ -105,6 +132,9 @@ export function OrderPanel({
   onRemove?: (key: string) => void;
   onClear?: () => void;
   onPay?: () => void;
+  reward?: PanelReward | null;
+  onScanReward?: () => void;
+  onRemoveReward?: () => void;
 }) {
   const [selKey, setSelKey] = useState<string | null>(null);
   const selected = !locked ? lines.find((l) => l.key === selKey) : undefined;
@@ -131,6 +161,12 @@ export function OrderPanel({
         </span>
       </div>
 
+      {reward && (
+        <div className="line-in mx-3.5 mt-2.5 flex justify-between gap-2 rounded-[8px] px-2.5 py-[7px] text-[12px] font-semibold" style={{ background: "#E5F8EC", color: "#0A7A3B" }}>
+          <span className="truncate">{reward.member} · LINE member</span>
+          <span className="mono shrink-0">{reward.memberLabel}</span>
+        </div>
+      )}
       <div className="scroll min-h-0 flex-1 overflow-y-auto px-1 py-1.5" style={{ opacity: locked ? 0.92 : 1, touchAction: "pan-y" }}>
         {!hasLines ? (
           <EmptyOrderState />
@@ -141,6 +177,7 @@ export function OrderPanel({
                 <LineItem line={line} onTap={locked ? undefined : (l) => setSelKey(l.key)} selected={selKey === line.key} />
               </div>
             ))}
+            {reward && <RewardLine reward={reward} onRemove={locked ? undefined : onRemoveReward} />}
           </div>
         )}
       </div>
@@ -174,6 +211,16 @@ export function OrderPanel({
           >
             Clear
           </button>
+          {onScanReward && (
+            <button
+              type="button"
+              onClick={onScanReward}
+              disabled={!hasLines || !canPay}
+              className="tap rounded-[12px] border border-line-2 bg-card px-4 py-[18px] text-[14px] font-semibold text-ink disabled:text-muted-2"
+            >
+              {reward ? "⌗ Change reward" : "⌗ Scan reward"}
+            </button>
+          )}
           <button
             type="button"
             onClick={onPay}
@@ -270,11 +317,7 @@ export function OrderDrawer(props: Parameters<typeof OrderPanel>[0]) {
   }
 
   return (
-    <div
-      className="absolute inset-0 z-20 flex flex-col"
-      style={{ background: "rgba(28,24,20,0.25)", opacity: closing ? 0 : 1, transition: "opacity 220ms ease" }}
-      onClick={close}
-    >
+    <div className="absolute inset-0 z-20 flex flex-col" style={{ background: "rgba(28,24,20,0.25)", opacity: closing ? 0 : 1, transition: "opacity 220ms ease" }} onClick={close}>
       <div className="flex-1" />
       <div
         className="relative flex max-h-[88%] min-h-[60%] flex-col overflow-hidden rounded-t-[18px] bg-paper"

@@ -4,6 +4,7 @@
 // Text goes through the browser's fonts. Latin uses the app's own faces (DM Sans, JetBrains Mono,
 // Newsreader); those files have no Thai, so Thai falls back per glyph to the device's Thai font.
 import { money } from "@/lib/format";
+import { drawQr } from "@/lib/qr";
 import { PAPER_DOTS, type PaperWidth } from "./escpos";
 
 export type ReceiptLine = { name: string; mods: string[]; qty: number; unitSatang: number; totalSatang: number };
@@ -21,6 +22,10 @@ export type Receipt = {
   tenderSatang?: number | null;
   changeSatang?: number | null;
   footer?: string[];
+  // loyalty reward used on this order (a fixed discount set by the API)
+  discount?: { label: string; satang: number } | null;
+  // loyalty: one-time "scan with LINE to collect points" QR (same token as the success screen)
+  claim?: { url: string; code: string; points: number } | null;
 };
 export type ReceiptImages = { logo?: HTMLImageElement | null; bottom?: HTMLImageElement | null };
 
@@ -160,6 +165,14 @@ class Pen {
     this.y += this.px(9);
   }
 
+  // Centered QR, `size` dots square
+  qr(text: string, size: number) {
+    const s = this.px(size);
+    this.y += this.px(6);
+    drawQr(this.g, text, Math.round((this.W - s) / 2), this.y, s);
+    this.y += s;
+  }
+
   // Centered picture, scaled to `widthFrac` of the paper (capped by maxH), dithered to 1-bit
   image(img: HTMLImageElement | null | undefined, widthFrac: number, maxH: number) {
     if (!img || !img.complete || !img.naturalWidth) return;
@@ -258,6 +271,10 @@ export function drawReceipt(r: Receipt, paper: PaperWidth = 80, images: ReceiptI
   }
   p.rule();
 
+  if (r.discount) {
+    p.row(`ส่วนลด · ${r.discount.label}`, `-${money(r.discount.satang).replace("฿", "")}`, 21, { rightFamily: p.f.mono });
+    p.gap(3);
+  }
   const count = r.lines.reduce((n, l) => n + l.qty, 0);
   p.row(`${count} ชิ้น   รวมทั้งสิ้น`, money(r.totalSatang), 24, { weight: 600, rightFamily: p.f.mono, rightSize: 40, rightWeight: 700 });
   p.rule();
@@ -270,5 +287,12 @@ export function drawReceipt(r: Receipt, paper: PaperWidth = 80, images: ReceiptI
 
   (r.footer?.length ? r.footer : ["THANK YOU", "ENJOY YOUR DAY ♡"]).forEach((f) => p.center(f, 22));
   p.image(images.bottom, 0.3, 220);
+
+  if (r.claim) {
+    p.rule();
+    p.qr(r.claim.url, 220);
+    p.center(`สแกนด้วย LINE รับ ${r.claim.points} แต้ม`, 22, { weight: 600 });
+    p.center(`หรือพิมพ์รหัส ${r.claim.code}`, 20, { family: p.f.mono });
+  }
   return p.done();
 }

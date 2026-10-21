@@ -14,6 +14,7 @@ export const BO_NAV = [
   { id: "/backoffice/history", label: "Stock history" },
   { id: "/backoffice/shifts", label: "Shifts" },
   { id: "/backoffice/staff", label: "Staff" },
+  { id: "/backoffice/loyalty", label: "Loyalty" },
 ];
 
 // Back office frame: vertical rail on wide screens (as designed), scrollable tab row otherwise.

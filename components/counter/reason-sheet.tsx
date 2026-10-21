@@ -31,6 +31,7 @@ export function ReasonSheet({
   error,
   onClose,
   onSubmit,
+  notice,
 }: {
   kind: "void" | "refund";
   orderNumber: number;
@@ -41,6 +42,8 @@ export function ReasonSheet({
   error?: string | null;
   onClose: () => void;
   onSubmit: (reason: string) => void;
+  // what this does to LINE points, if anything
+  notice?: string | null;
 }) {
   const [reason, setReason] = useState("");
   const isVoid = kind === "void";
@@ -66,6 +69,11 @@ export function ReasonSheet({
         </>
       }
     >
+      {notice && (
+        <div className="rounded-[10px] px-3.5 py-3 text-[13px] font-medium leading-[1.45]" style={{ background: "#F6ECCB", color: "#5E450A" }}>
+          {notice}
+        </div>
+      )}
       <Field label="Reason" hint="Required · saved to the audit log">
         <TextInput value={reason} onChange={(v) => setReason(v.slice(0, 255))} placeholder={isVoid ? "Why is this order being voided?" : "Why is this order being refunded?"} autoFocus />
       </Field>

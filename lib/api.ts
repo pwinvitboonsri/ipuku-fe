@@ -47,14 +47,15 @@ async function parse(res: Response) {
 }
 
 function errorFrom(res: Response, body: unknown): ApiError {
-  const b = (body ?? {}) as { message?: unknown; code?: string };
+  // loyalty routes name the failure "reason" (USED, EXPIRED…)
+  const b = (body ?? {}) as { message?: unknown; code?: string; reason?: string };
   const messages = Array.isArray(b.message)
     ? b.message.map(String)
     : typeof b.message === "string"
       ? [b.message]
       : [res.statusText || `Request failed (${res.status})`];
   const ra = Number(res.headers.get("retry-after"));
-  return new ApiError(res.status, messages, b.code, Number.isFinite(ra) && ra > 0 ? ra : undefined);
+  return new ApiError(res.status, messages, b.code ?? b.reason, Number.isFinite(ra) && ra > 0 ? ra : undefined);
 }
 
 // Render's free plan sleeps when idle and doesn't wake for requests relayed by our Worker, but does

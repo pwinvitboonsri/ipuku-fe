@@ -15,6 +15,7 @@ import { Btn } from "@/components/ui/btn";
 import { Card, PageHead, Pill, Spinner, labelCls } from "@/components/ui/bits";
 import { FilterChips } from "@/components/ui/glass-tabs";
 import { ReasonSheet } from "./reason-sheet";
+import { OrderLoyalty, loyaltyNotice } from "./order-loyalty";
 
 type Filter = "ALL" | OrderStatus;
 
@@ -102,11 +103,18 @@ function OrderDetail({ o, isOwner, staff, onVoid, onRefund, onTakePayment }: { o
               <span className="mono text-[14px]">{money(l.line_total_satang)}</span>
             </div>
           ))}
+          {o.discount_satang > 0 && (
+            <div className="flex justify-between gap-3 border-b border-line py-2.5 text-matcha">
+              <span className="text-[14.5px] font-medium">Reward · {o.reward_code?.reward_name ?? "Discount"}</span>
+              <span className="mono text-[14px]">−{money(o.discount_satang)}</span>
+            </div>
+          )}
           <div className="flex justify-between pt-2.5 text-[17px] font-semibold">
             <span>Total</span>
             <span className="mono">{money(o.total_satang)}</span>
           </div>
         </div>
+        <OrderLoyalty o={o} />
         {sales.length > 0 && (
           <Card pad={14}>
             <div className={`${labelCls} mb-1.5`}>{split ? "Payment · split" : "Payment"}</div>
@@ -268,6 +276,7 @@ export function ShiftOrders() {
           orderNumber={sel.order_number}
           total={sel.total_satang}
           payments={salePayments(sel)}
+          notice={loyaltyNotice(sel, sheet)}
           busy={act.isPending}
           error={act.isError ? errorText(act.error) : null}
           onClose={() => setSheet(null)}

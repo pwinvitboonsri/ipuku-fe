@@ -16,6 +16,7 @@ export const bo = {
   movements: (f: object) => ["bo", "movements", f] as const,
   shifts: (f: object) => ["bo", "shifts", f] as const,
   staff: ["bo", "staff"] as const,
+  loyalty: ["bo", "loyalty"] as const,
 };
 
 const ALL = { include_inactive: true };

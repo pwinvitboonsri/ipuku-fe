@@ -7,8 +7,11 @@ import { usePrintOrder } from "@/lib/print/use-print";
 import { useStaffName } from "@/lib/session";
 import type { Order, StockAlert } from "@/lib/types";
 import { Pill } from "@/components/ui/bits";
+import { ClaimPanel, useClaimWatch } from "./claim-panel";
 
 const AUTO_NEXT_S = 8;
+// time for the customer to scan the points QR before the screen moves on
+const AUTO_NEXT_CLAIM_S = 30;
 
 function Row({ k, children }: { k: string; children: React.ReactNode }) {
   return (
@@ -57,7 +60,9 @@ function StockAlertCard({ alerts }: { alerts: StockAlert[] }) {
 // With a stock alert the screen waits for a tap instead of moving on, so the alert isn't missed.
 export function SuccessScreen({ order, stockAlerts = [], onNextOrder }: { order: Order; stockAlerts?: StockAlert[]; onNextOrder: () => void }) {
   const hold = stockAlerts.length > 0;
-  const [countdown, setCountdown] = useState(AUTO_NEXT_S);
+  const claim = useClaimWatch(order);
+  const showClaim = !!claim?.url;
+  const [countdown, setCountdown] = useState(showClaim ? AUTO_NEXT_CLAIM_S : AUTO_NEXT_S);
   const sales = salePayments(order);
   const split = sales.length > 1;
   const cash = cashPayment(order);
@@ -70,7 +75,8 @@ export function SuccessScreen({ order, stockAlerts = [], onNextOrder }: { order:
   useEffect(() => {
     if (autoDone.current) return;
     autoDone.current = true;
-    print({ slips: printer.auto, stickers: sticker.auto });
+    // no sticker printer chosen yet: don't fail (and hold the screen) on every sale
+    print({ slips: printer.auto, stickers: sticker.auto && !!sticker.printer });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per order
   }, []);
 
@@ -89,71 +95,94 @@ export function SuccessScreen({ order, stockAlerts = [], onNextOrder }: { order:
   return (
     <div className="relative flex min-h-0 flex-1 flex-col bg-paper" data-screen-label="Payment success">
       <div className="h-1.5 bg-matcha" />
-      <div className="scroll flex min-h-0 flex-1 flex-col items-center gap-1.5 overflow-y-auto px-4 pb-4 pt-6 text-center sm:px-10 sm:pt-7">
-        <div className="pop draw mb-1 flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full bg-matcha" style={{ boxShadow: "0 12px 32px rgba(107,127,74,0.32)" }}>
-          <svg width="38" height="38" viewBox="0 0 48 48" fill="none">
-            <path d="M12 24l8 8 16-17" stroke="#fff" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
-        <div className="text-[11px] font-semibold tracking-[1.4px] text-muted">PAID · QUEUE NUMBER</div>
-        <div className="mono rise text-[60px] font-semibold leading-none tracking-[-3px] text-ink sm:text-[72px]">#{order.order_number}</div>
-        <div className="serif-i rise-2 whitespace-nowrap text-[30px] leading-[1.1] tracking-[-0.5px] text-ink">Thank you.</div>
+      <div className="flex min-h-0 flex-1">
+        <div className="scroll flex min-h-0 flex-1 flex-col items-center gap-1.5 overflow-y-auto px-4 pb-4 pt-6 text-center sm:px-10 sm:pt-7">
+          <div className="pop draw mb-1 flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full bg-matcha" style={{ boxShadow: "0 12px 32px rgba(107,127,74,0.32)" }}>
+            <svg width="38" height="38" viewBox="0 0 48 48" fill="none">
+              <path d="M12 24l8 8 16-17" stroke="#fff" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <div className="text-[11px] font-semibold tracking-[1.4px] text-muted">PAID · QUEUE NUMBER</div>
+          <div className="mono rise text-[60px] font-semibold leading-none tracking-[-3px] text-ink sm:text-[72px]">#{order.order_number}</div>
+          <div className="serif-i rise-2 whitespace-nowrap text-[30px] leading-[1.1] tracking-[-0.5px] text-ink">Thank you.</div>
 
-        <div className="rise-3 mt-3.5 flex w-full max-w-[460px] shrink-0 flex-col gap-2 rounded-[14px] border border-line bg-card px-5 py-4 text-left shadow-sm">
-          <div className="flex items-baseline justify-between">
-            <span className="text-[12px] font-semibold tracking-[0.8px] text-muted">STATUS</span>
-            <Pill tone="PAID">Paid</Pill>
-          </div>
-          <Row k="Items">
-            <span className="text-[14px] font-medium text-ink">{itemCount(order)} items</span>
-          </Row>
-          <Row k="Method">
-            <span className="text-[14px] font-medium text-ink">{paymentLabel(order) || "—"}</span>
-          </Row>
-          {split
-            ? sales.map((p) => (
-                <Row key={p.id} k={p.method === "CASH" ? "Cash part" : p.reference ? `PromptPay · ${p.reference}` : "PromptPay part"}>
-                  <span className="mono text-[14px] font-medium text-ink">{money(p.amount_satang)}</span>
-                </Row>
-              ))
-            : !cash && (
-                <Row k="Slip reference">
-                  <span className={`mono text-[14px] ${sales[0]?.reference ? "text-ink" : "text-muted"}`}>{sales[0]?.reference || "—"}</span>
-                </Row>
-              )}
-          {cash && (
-            <Row k={split ? "Cash tendered" : "Tendered"}>
-              <span className="mono text-[14px] font-medium text-ink">{money(cash.tender_satang ?? 0)}</span>
+          <div className="rise-3 mt-3.5 flex w-full max-w-[460px] shrink-0 flex-col gap-2 rounded-[14px] border border-line bg-card px-5 py-4 text-left shadow-sm">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[12px] font-semibold tracking-[0.8px] text-muted">STATUS</span>
+              <Pill tone="PAID">Paid</Pill>
+            </div>
+            <Row k="Items">
+              <span className="text-[14px] font-medium text-ink">{itemCount(order)} items</span>
             </Row>
-          )}
-          <div className="mt-0.5 flex justify-between border-t border-line pt-2.5">
-            <span className="text-[15px] font-semibold text-ink">Total paid</span>
-            <span className="mono text-[18px] font-semibold text-ink">{money(order.total_satang)}</span>
+            <Row k="Method">
+              <span className="text-[14px] font-medium text-ink">{paymentLabel(order) || "—"}</span>
+            </Row>
+            {split
+              ? sales.map((p) => (
+                  <Row key={p.id} k={p.method === "CASH" ? "Cash part" : p.reference ? `PromptPay · ${p.reference}` : "PromptPay part"}>
+                    <span className="mono text-[14px] font-medium text-ink">{money(p.amount_satang)}</span>
+                  </Row>
+                ))
+              : !cash && (
+                  <Row k="Slip reference">
+                    <span className={`mono text-[14px] ${sales[0]?.reference ? "text-ink" : "text-muted"}`}>{sales[0]?.reference || "—"}</span>
+                  </Row>
+                )}
+            {cash && (
+              <Row k={split ? "Cash tendered" : "Tendered"}>
+                <span className="mono text-[14px] font-medium text-ink">{money(cash.tender_satang ?? 0)}</span>
+              </Row>
+            )}
+            <div className="mt-0.5 flex justify-between border-t border-line pt-2.5">
+              <span className="text-[15px] font-semibold text-ink">Total paid</span>
+              <span className="mono text-[18px] font-semibold text-ink">{money(order.total_satang)}</span>
+            </div>
+            {cash && change > 0 && (
+              <div className="mt-1.5 flex items-center justify-between rounded-[12px] bg-ink px-[18px] py-3.5 text-paper">
+                <span className="whitespace-nowrap text-[14px] font-medium tracking-[0.3px]">Change due</span>
+                <span className="mono text-[22px] font-semibold">{money(change)}</span>
+              </div>
+            )}
           </div>
-          {cash && change > 0 && (
-            <div className="mt-1.5 flex items-center justify-between rounded-[12px] bg-ink px-[18px] py-3.5 text-paper">
-              <span className="whitespace-nowrap text-[14px] font-medium tracking-[0.3px]">Change due</span>
-              <span className="mono text-[22px] font-semibold">{money(change)}</span>
+          {showClaim && (
+            <div className="mt-3 w-full max-w-[460px] md:hidden">
+              <ClaimPanel claim={claim!} />
             </div>
           )}
+          {hold && <StockAlertCard alerts={stockAlerts} />}
+          {printer.enabled || sticker.enabled ? (
+            <div className="mt-2.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[12.5px] text-muted">
+              <span className={status?.error ? "font-medium text-persimmon-2" : ""}>{busy ? "Printing…" : (status?.text ?? "Not printed yet.")}</span>
+              {printer.enabled && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => print({ slips: true, stickers: false })}
+                  className="tap rounded-full border border-line-2 bg-card px-3.5 py-1.5 text-[13px] font-semibold text-ink"
+                >
+                  Print receipt
+                </button>
+              )}
+              {sticker.enabled && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => print({ slips: false, stickers: true })}
+                  className="tap rounded-full border border-line-2 bg-card px-3.5 py-1.5 text-[13px] font-semibold text-ink"
+                >
+                  Print stickers
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="mt-2.5 text-[12px] text-muted">Receipt printing is off on this tablet — call out the queue number.</div>
+          )}
         </div>
-        {hold && <StockAlertCard alerts={stockAlerts} />}
-        {printer.enabled || sticker.enabled ? (
-          <div className="mt-2.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[12.5px] text-muted">
-            <span className={status?.error ? "font-medium text-persimmon-2" : ""}>{busy ? "Printing…" : (status?.text ?? "Not printed yet.")}</span>
-            {printer.enabled && (
-              <button type="button" disabled={busy} onClick={() => print({ slips: true, stickers: false })} className="tap rounded-full border border-line-2 bg-card px-3.5 py-1.5 text-[13px] font-semibold text-ink">
-                Print receipt
-              </button>
-            )}
-            {sticker.enabled && (
-              <button type="button" disabled={busy} onClick={() => print({ slips: false, stickers: true })} className="tap rounded-full border border-line-2 bg-card px-3.5 py-1.5 text-[13px] font-semibold text-ink">
-                Print stickers
-              </button>
-            )}
+        {/* beside the summary on wide screens, so the tablet can be turned to the customer */}
+        {showClaim && (
+          <div className="hidden md:flex">
+            <ClaimPanel claim={claim!} />
           </div>
-        ) : (
-          <div className="mt-2.5 text-[12px] text-muted">Receipt printing is off on this tablet — call out the queue number.</div>
         )}
       </div>
 

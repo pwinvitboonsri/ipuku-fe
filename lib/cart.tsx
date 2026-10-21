@@ -4,8 +4,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { v7 as uuidv7 } from "uuid";
 import { ApiError, api, errorText } from "./api";
+import { rewardPreview } from "./loyalty";
 import { orderKeys, type DisplayLine } from "./orders";
-import type { MenuOption, MenuProduct, Order, StockAlert } from "./types";
+import type { MenuOption, MenuProduct, Order, StockAlert, ValidatedReward } from "./types";
 
 // The cart lives on the device until Charge. Prices here are a preview; the server re-prices at create.
 
@@ -13,18 +14,19 @@ export type CartLine = DisplayLine & { optionIds: string[] };
 export type Step = "sell" | "payment" | "success";
 export type CreateState = "creating" | "retry" | "error" | null;
 
-type Persisted = { lines: CartLine[]; pendingId: string | null };
+// reward: a LINE reward code validated at the counter; its discount is set by the server at charge
+type Persisted = { lines: CartLine[]; pendingId: string | null; reward?: ValidatedReward | null };
 const STORAGE_KEY = "ipk-cart";
 
 function load(): Persisted {
-  if (typeof window === "undefined") return { lines: [], pendingId: null };
+  if (typeof window === "undefined") return { lines: [], pendingId: null, reward: null };
   try {
     const raw = window.sessionStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw);
   } catch {
     /* storage unavailable — start empty */
   }
-  return { lines: [], pendingId: null };
+  return { lines: [], pendingId: null, reward: null };
 }
 
 const sameOptions = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
@@ -44,7 +46,9 @@ export function linesFromOrder(o: Order): CartLine[] {
 
 type CartCtx = {
   lines: CartLine[];
-  previewTotal: number;
+  previewTotal: number; // after the reward discount
+  reward: ValidatedReward | null;
+  rewardDiscount: number | null; // preview; null = the reward's free item isn't in the cart
   step: Step;
   order: Order | null; // the server order during payment / success
   stockAlerts: StockAlert[]; // ingredients the last payment took to/below reorder level (success screen)
@@ -55,6 +59,7 @@ type CartCtx = {
   setQty: (key: string, qty: number) => void;
   remove: (key: string) => void;
   clear: () => void;
+  setReward: (r: ValidatedReward | null) => void;
   charge: () => void;
   retryCreate: () => void;
   backToCart: () => void;
@@ -72,6 +77,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [lines, setLines] = useState<CartLine[]>(initial.lines);
   // client_order_id for the current cart. Reused on retry; dropped whenever the cart changes.
   const [pendingId, setPendingId] = useState<string | null>(initial.pendingId);
+  const [reward, setRewardState] = useState<ValidatedReward | null>(initial.reward ?? null);
   const [step, setStep] = useState<Step>("sell");
   const [order, setOrder] = useState<Order | null>(null);
   const [stockAlerts, setStockAlerts] = useState<StockAlert[]>([]);
@@ -80,11 +86,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ lines, pendingId } satisfies Persisted));
+      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ lines, pendingId, reward } satisfies Persisted));
     } catch {
       /* ignore */
     }
-  }, [lines, pendingId]);
+  }, [lines, pendingId, reward]);
 
   const edit = useCallback((fn: (ls: CartLine[]) => CartLine[]) => {
     setLines(fn);
@@ -92,10 +98,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const create = useMutation({
-    mutationFn: (vars: { id: string; lines: CartLine[] }) =>
+    mutationFn: (vars: { id: string; lines: CartLine[]; rewardCode: string | null }) =>
       api.post<Order>("/order/create", {
         client_order_id: vars.id,
         items: vars.lines.map((l) => ({ product_id: l.productId, quantity: l.qty, modifier_option_ids: l.optionIds })),
+        ...(vars.rewardCode && { reward_code: vars.rewardCode }),
       }),
     onSuccess: (o) => {
       setOrder(o);
@@ -114,11 +121,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const startCreate = (id: string) => {
       setCreateState("creating");
       setCreateError(null);
-      create.mutate({ id, lines });
+      create.mutate({ id, lines, rewardCode: reward?.code ?? null });
     };
+    const subtotal = lines.reduce((s, l) => s + l.totalSatang, 0);
+    const discount = reward ? rewardPreview(reward, lines, subtotal) : null;
     return {
       lines,
-      previewTotal: lines.reduce((s, l) => s + l.totalSatang, 0),
+      previewTotal: subtotal - (discount ?? 0),
+      reward,
+      rewardDiscount: discount,
       step,
       order,
       stockAlerts,
@@ -131,15 +142,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
         edit((ls) => {
           const same = ls.find((l) => l.productId === p.id && sameOptions(l.optionIds, optionIds));
           if (same) return ls.map((l) => (l === same ? { ...l, qty: l.qty + qty, totalSatang: l.unitSatang * (l.qty + qty) } : l));
-          return [
-            ...ls,
-            { key: uuidv7(), productId: p.id, name: p.name, imageUrl: p.image_url, mods: options.map((o) => o.name), optionIds, qty, unitSatang: unit, totalSatang: unit * qty },
-          ];
+          return [...ls, { key: uuidv7(), productId: p.id, name: p.name, imageUrl: p.image_url, mods: options.map((o) => o.name), optionIds, qty, unitSatang: unit, totalSatang: unit * qty }];
         });
       },
       setQty: (key, qty) => edit((ls) => ls.map((l) => (l.key === key ? { ...l, qty, totalSatang: l.unitSatang * qty } : l))),
       remove: (key) => edit((ls) => ls.filter((l) => l.key !== key)),
-      clear: () => edit(() => []),
+      clear: () => {
+        edit(() => []);
+        setRewardState(null);
+      },
+      setReward: (r) => {
+        setRewardState(r);
+        setPendingId(null);
+      },
       charge: () => {
         if (!lines.length) return;
         const id = pendingId ?? uuidv7();
@@ -168,6 +183,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         if (o.client_order_id === pendingId) {
           setLines([]);
           setPendingId(null);
+          setRewardState(null);
         }
         qc.invalidateQueries({ queryKey: orderKeys.all });
         // a stock status changed, so the grid's Low / Out tags must refresh
@@ -188,7 +204,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setStep("sell");
       },
     };
-  }, [lines, step, order, stockAlerts, createState, createError, pendingId, create, edit, qc]);
+  }, [lines, reward, step, order, stockAlerts, createState, createError, pendingId, create, edit, qc]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

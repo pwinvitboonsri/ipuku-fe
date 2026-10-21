@@ -13,6 +13,8 @@ import { CategoryTabs, ItemGrid } from "./item-grid";
 import { ModifierModal } from "./modifier-modal";
 import { OrderDrawer, OrderPanel } from "./order-panel";
 import { PaymentScreen } from "./payment-screen";
+import { RewardScanSheet } from "./reward-scan-sheet";
+import { panelReward } from "@/lib/loyalty";
 import { SuccessScreen } from "./success-screen";
 
 // Sell → Take payment → Paid. The step lives in the cart context so it survives switching tabs.
@@ -24,6 +26,7 @@ export function SellScreen() {
   const [picked, setPicked] = useState<string | null>(null);
   const [search, setSearch] = useState<string | null>(null);
   const [modal, setModal] = useState<MenuProduct | null>(null);
+  const [scanning, setScanning] = useState(false);
 
   if (cart.step === "payment") return <PaymentScreen />;
   if (cart.step === "success" && cart.order) return <SuccessScreen order={cart.order} stockAlerts={cart.stockAlerts} onNextOrder={cart.nextOrder} />;
@@ -63,6 +66,9 @@ export function SellScreen() {
     onRemove: cart.remove,
     onClear: cart.clear,
     onPay: cart.charge,
+    reward: panelReward(null, cart.reward, cart.rewardDiscount),
+    onScanReward: () => setScanning(true),
+    onRemoveReward: () => cart.setReward(null),
   };
 
   const grid = (
@@ -92,6 +98,7 @@ export function SellScreen() {
           </div>
         </>
       )}
+      {scanning && <RewardScanSheet onClose={() => setScanning(false)} />}
       {modal && (
         <ModifierModal
           key={modal.id}

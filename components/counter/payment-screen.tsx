@@ -4,6 +4,8 @@
 import { useMutation } from "@tanstack/react-query";
 import { useMemo, useState, type ReactNode } from "react";
 import { ApiError, api, errorText, request } from "@/lib/api";
+import { panelReward } from "@/lib/loyalty";
+import { loyaltyNotice } from "./order-loyalty";
 import { useCart } from "@/lib/cart";
 import { bahtLabel, money } from "@/lib/format";
 import { orderLines } from "@/lib/orders";
@@ -519,10 +521,10 @@ export function PaymentScreen() {
         </div>
         {wide ? (
           <div className="w-[40%] min-h-0">
-            <OrderPanel lines={lines} total={total} locked orderNumber={order?.order_number} />
+            <OrderPanel lines={lines} total={total} locked orderNumber={order?.order_number} reward={panelReward(order ?? null, cart.reward, cart.rewardDiscount)} />
           </div>
         ) : (
-          <OrderDrawer lines={lines} total={total} locked orderNumber={order?.order_number} />
+          <OrderDrawer lines={lines} total={total} locked orderNumber={order?.order_number} reward={panelReward(order ?? null, cart.reward, cart.rewardDiscount)} />
         )}
         {cart.createState && <CreateOverlay state={cart.createState} error={cart.createError} clientOrderId={cart.pendingId} onRetry={cart.retryCreate} onBack={cart.backToCart} />}
       </div>
@@ -532,6 +534,7 @@ export function PaymentScreen() {
           kind="void"
           orderNumber={order.order_number}
           total={order.total_satang}
+          notice={loyaltyNotice(order, "void")}
           busy={voidOrder.isPending}
           error={voidOrder.isError ? errorText(voidOrder.error) : null}
           onClose={() => setVoidOpen(false)}
