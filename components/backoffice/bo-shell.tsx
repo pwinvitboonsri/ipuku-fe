@@ -8,6 +8,7 @@ import { GlassTabs } from "@/components/ui/glass-tabs";
 import { ScrollRow } from "@/components/ui/scroll-row";
 
 export const BO_NAV = [
+  { id: "/backoffice/dashboard", label: "Dashboard" },
   { id: "/backoffice/menu", label: "Menu" },
   { id: "/backoffice/groups", label: "Option groups" },
   { id: "/backoffice/inventory", label: "Inventory" },

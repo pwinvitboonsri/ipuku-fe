@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function BackofficePage() {
-  redirect("/backoffice/menu");
+  redirect("/backoffice/dashboard");
 }
