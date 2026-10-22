@@ -54,6 +54,8 @@ type CartCtx = {
   stockAlerts: StockAlert[]; // ingredients the last payment took to/below reorder level (success screen)
   createState: CreateState;
   createError: string | null;
+  // the reward is on another open order (e.g. one created before a timeout): its number, to offer voiding it
+  heldBy: { id: string; number: number } | null;
   pendingId: string | null;
   add: (p: MenuProduct, options: MenuOption[], qty: number) => void;
   setQty: (key: string, qty: number) => void;
@@ -62,6 +64,7 @@ type CartCtx = {
   setReward: (r: ValidatedReward | null) => void;
   charge: () => void;
   retryCreate: () => void;
+  freeRewardAndRetry: () => void;
   backToCart: () => void;
   takePaymentFor: (o: Order) => void;
   paid: (o: Order, stockAlerts?: StockAlert[]) => void;
@@ -83,6 +86,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [stockAlerts, setStockAlerts] = useState<StockAlert[]>([]);
   const [createState, setCreateState] = useState<CreateState>(null);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [heldBy, setHeldBy] = useState<{ id: string; number: number } | null>(null);
 
   useEffect(() => {
     try {
@@ -114,6 +118,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const unreachable = err instanceof ApiError && [0, 502, 503, 504].includes(err.status);
       setCreateState(unreachable ? "retry" : "error");
       setCreateError(errorText(err));
+      const b = err instanceof ApiError ? err.body : {};
+      setHeldBy(err instanceof ApiError && err.code === "APPLIED" && typeof b.order_id === "string" ? { id: b.order_id, number: Number(b.order_number) } : null);
     },
   });
 
@@ -121,6 +127,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const startCreate = (id: string) => {
       setCreateState("creating");
       setCreateError(null);
+      setHeldBy(null);
       create.mutate({ id, lines, rewardCode: reward?.code ?? null });
     };
     const subtotal = lines.reduce((s, l) => s + l.totalSatang, 0);
@@ -135,6 +142,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       stockAlerts,
       createState,
       createError,
+      heldBy,
       pendingId,
       add: (p, options, qty) => {
         const optionIds = options.map((o) => o.id);
@@ -164,6 +172,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
         startCreate(id);
       },
       retryCreate: () => pendingId && startCreate(pendingId),
+      freeRewardAndRetry: () => {
+        if (!heldBy || !pendingId) return;
+        setCreateState("creating");
+        // voiding the open order puts the reward back on the customer's code; then create this one
+        api
+          .post(`/order/${heldBy.id}/void`, { reason: `Reward moved to a new order` })
+          .then(() => {
+            qc.invalidateQueries({ queryKey: orderKeys.all });
+            startCreate(pendingId);
+          })
+          .catch((err) => {
+            setCreateState("error");
+            setCreateError(errorText(err));
+          });
+      },
       backToCart: () => {
         // Keep pendingId: if the cart is charged again unchanged, the server returns the same order.
         setCreateState(null);
@@ -204,7 +227,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setStep("sell");
       },
     };
-  }, [lines, reward, step, order, stockAlerts, createState, createError, pendingId, create, edit, qc]);
+  }, [lines, reward, step, order, stockAlerts, createState, createError, heldBy, pendingId, create, edit, qc]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -12,7 +12,9 @@ export type PrintStatus = { text: string; error: boolean };
 // Print buttons for one order: slips (ticket + receipt) and cup stickers, each on its own printer.
 export function usePrintOrder(order: Order, staff?: string) {
   const printer = usePrinterSettings();
-  const sticker = useStickerSettings();
+  const saved = useStickerSettings();
+  // stickers only go by printer name: with none chosen yet, they're off (no buttons, no auto-print)
+  const sticker = { ...saved, enabled: saved.enabled && !!saved.printer };
   const [status, setStatus] = useState<PrintStatus | null>(null);
   const [busy, setBusy] = useState(false);
 

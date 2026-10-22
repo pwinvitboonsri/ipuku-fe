@@ -8,13 +8,16 @@ export class ApiError extends Error {
   messages: string[];
   code?: string;
   retryAfter?: number;
+  // the error response, for details beyond the message (e.g. the order holding a reward code)
+  body: Record<string, unknown>;
 
-  constructor(status: number, messages: string[], code?: string, retryAfter?: number) {
+  constructor(status: number, messages: string[], code?: string, retryAfter?: number, body: Record<string, unknown> = {}) {
     super(messages[0] ?? `Request failed (${status})`);
     this.status = status;
     this.messages = messages;
     this.code = code;
     this.retryAfter = retryAfter;
+    this.body = body;
   }
 }
 
@@ -55,7 +58,7 @@ function errorFrom(res: Response, body: unknown): ApiError {
       ? [b.message]
       : [res.statusText || `Request failed (${res.status})`];
   const ra = Number(res.headers.get("retry-after"));
-  return new ApiError(res.status, messages, b.code ?? b.reason, Number.isFinite(ra) && ra > 0 ? ra : undefined);
+  return new ApiError(res.status, messages, b.code ?? b.reason, Number.isFinite(ra) && ra > 0 ? ra : undefined, b as Record<string, unknown>);
 }
 
 // Render's free plan sleeps when idle and doesn't wake for requests relayed by our Worker, but does

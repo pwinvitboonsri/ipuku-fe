@@ -75,8 +75,7 @@ export function SuccessScreen({ order, stockAlerts = [], onNextOrder }: { order:
   useEffect(() => {
     if (autoDone.current) return;
     autoDone.current = true;
-    // no sticker printer chosen yet: don't fail (and hold the screen) on every sale
-    print({ slips: printer.auto, stickers: sticker.auto && !!sticker.printer });
+    print({ slips: printer.auto, stickers: sticker.auto });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per order
   }, []);
 
@@ -123,7 +122,8 @@ export function SuccessScreen({ order, stockAlerts = [], onNextOrder }: { order:
                     <span className="mono text-[14px] font-medium text-ink">{money(p.amount_satang)}</span>
                   </Row>
                 ))
-              : !cash && (
+              : !cash &&
+                sales.length > 0 && (
                   <Row k="Slip reference">
                     <span className={`mono text-[14px] ${sales[0]?.reference ? "text-ink" : "text-muted"}`}>{sales[0]?.reference || "—"}</span>
                   </Row>

@@ -425,7 +425,23 @@ function MethodTabs({ method, onChange }: { method: PayMethod; onChange: (m: Pay
   );
 }
 
-function CreateOverlay({ state, error, clientOrderId, onRetry, onBack }: { state: "creating" | "retry" | "error"; error: string | null; clientOrderId: string | null; onRetry: () => void; onBack: () => void }) {
+function CreateOverlay({
+  state,
+  error,
+  clientOrderId,
+  heldBy,
+  onRetry,
+  onFreeReward,
+  onBack,
+}: {
+  state: "creating" | "retry" | "error";
+  error: string | null;
+  clientOrderId: string | null;
+  heldBy: { id: string; number: number } | null;
+  onRetry: () => void;
+  onFreeReward: () => void;
+  onBack: () => void;
+}) {
   return (
     <div className="absolute inset-0 z-[6] flex items-center justify-center p-8" style={{ background: "rgba(245,241,232,0.92)" }}>
       {state === "creating" ? (
@@ -441,6 +457,11 @@ function CreateOverlay({ state, error, clientOrderId, onRetry, onBack }: { state
               ? "The request timed out. Retrying is safe — it reuses the same order ID, so the customer won't get a duplicate."
               : error}
           </div>
+          {heldBy && (
+            <div className="text-[12.5px] leading-normal text-muted">
+              Order #{heldBy.number} is still open with this reward — usually one created before a timeout. Void it to use the reward here.
+            </div>
+          )}
           {state === "retry" && clientOrderId && <div className="mono text-[11px] text-muted">client_order_id {clientOrderId.slice(0, 18)}…</div>}
           <div className="flex gap-2">
             <Btn kind="secondary" onClick={onBack}>
@@ -449,6 +470,11 @@ function CreateOverlay({ state, error, clientOrderId, onRetry, onBack }: { state
             {state === "retry" && (
               <Btn kind="primary" style={{ flex: 1 }} onClick={onRetry}>
                 Retry
+              </Btn>
+            )}
+            {heldBy && (
+              <Btn kind="primary" style={{ flex: 1 }} onClick={onFreeReward}>
+                Void #{heldBy.number} &amp; continue
               </Btn>
             )}
           </div>
@@ -480,6 +506,8 @@ export function PaymentScreen() {
   const lines = order ? orderLines(order) : cart.lines;
   const total = order ? order.total_satang : cart.previewTotal;
   const notOpen = pay.error instanceof ApiError && /not OPEN/i.test(pay.error.message);
+  // a reward covered the whole order: nothing to collect
+  const covered = !!order && order.total_satang === 0;
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col" data-screen-label="Payment">
@@ -503,9 +531,18 @@ export function PaymentScreen() {
 
       <div className={`relative flex min-h-0 flex-1 ${wide ? "" : "flex-col"}`}>
         <div className={`@container flex min-h-0 flex-col ${wide ? "w-[60%]" : "flex-1"}`}>
-          <MethodTabs method={method} onChange={setMethod} />
-          <div key={method} className="fade-swap flex min-h-0 flex-1 flex-col">
-            {method === "cash" ? (
+          {!covered && <MethodTabs method={method} onChange={setMethod} />}
+          <div key={covered ? "covered" : method} className="fade-swap flex min-h-0 flex-1 flex-col">
+            {covered ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+                <div className="text-[13px] font-semibold tracking-[1px] text-muted">NOTHING TO PAY</div>
+                <div className="mono text-[44px] font-semibold">{money(0)}</div>
+                <div className="max-w-[340px] text-[13.5px] text-ink-2">The reward covers this order. Complete it to spend the member&apos;s points and print the receipt.</div>
+                <Btn kind="go" size="lg" disabled={pay.isPending} onClick={() => pay.mutate([])}>
+                  {pay.isPending ? "Completing…" : "Complete order"}
+                </Btn>
+              </div>
+            ) : method === "cash" ? (
               <CashPanel total={total} busy={pay.isPending} onConfirm={(tender) => pay.mutate([{ method: "CASH", amount_satang: total, tender_satang: tender }])} />
             ) : method === "qr" ? (
               <PromptPayPanel total={total} busy={pay.isPending} onConfirm={(reference) => pay.mutate([{ method: "PROMPTPAY", amount_satang: total, ...(reference ? { reference } : {}) }])} />
@@ -526,7 +563,17 @@ export function PaymentScreen() {
         ) : (
           <OrderDrawer lines={lines} total={total} locked orderNumber={order?.order_number} reward={panelReward(order ?? null, cart.reward, cart.rewardDiscount)} />
         )}
-        {cart.createState && <CreateOverlay state={cart.createState} error={cart.createError} clientOrderId={cart.pendingId} onRetry={cart.retryCreate} onBack={cart.backToCart} />}
+        {cart.createState && (
+          <CreateOverlay
+            state={cart.createState}
+            error={cart.createError}
+            clientOrderId={cart.pendingId}
+            heldBy={cart.heldBy}
+            onRetry={cart.retryCreate}
+            onFreeReward={cart.freeRewardAndRetry}
+            onBack={cart.backToCart}
+          />
+        )}
       </div>
 
       {voidOpen && order && (
