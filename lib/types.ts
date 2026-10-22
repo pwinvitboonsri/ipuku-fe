@@ -116,7 +116,8 @@ export type RewardRow = {
   max_discount_satang: number | null;
   sort_order: number;
   is_active: boolean;
-  product: { id: string; name: string; price_satang: number } | null;
+  image_url: string | null;
+  product: { id: string; name: string; price_satang: number; image_url: string | null } | null;
 };
 export type LoyaltyMember = {
   id: string;

@@ -12,7 +12,9 @@ import { Field, TextInput } from "@/components/ui/form";
 import { FilterChips, Segmented } from "@/components/ui/glass-tabs";
 import { Sheet } from "@/components/ui/sheet";
 import { Table, tdCls, thCls } from "@/components/ui/table";
+import { ItemPhoto } from "@/components/counter/item-photo";
 import { Loadable, Select } from "./common";
+import { PhotoField } from "./photo-field";
 
 // Back office → Loyalty (loyalty design, Flow 5): points rule + rewards, members, read-only activity log.
 
@@ -98,6 +100,8 @@ function RewardSheet({ row, onClose }: { row: RewardRow | null; onClose: () => v
   const [discount, setDiscount] = useState(row?.discount_satang ? bahtText(row.discount_satang) : "");
   const [productId, setProductId] = useState(row?.product?.id ?? "");
   const [maxDiscount, setMaxDiscount] = useState(row?.max_discount_satang ? bahtText(row.max_discount_satang) : "");
+  const [imageUrl, setImageUrl] = useState<string | null>(row?.image_url ?? null);
+  const [uploading, setUploading] = useState(false);
   const fixed = type === "FIXED_DISCOUNT";
 
   const discountSatang = parseBaht(discount);
@@ -106,6 +110,7 @@ function RewardSheet({ row, onClose }: { row: RewardRow | null; onClose: () => v
     name: name.trim(),
     cost_points: int(cost),
     type,
+    image_url: imageUrl,
     ...(fixed ? { discount_satang: discountSatang } : { product_id: productId, max_discount_satang: maxSatang }),
   };
   const ok = body.name && body.cost_points && (fixed ? (discountSatang ?? 0) >= 100 : productId && (maxSatang ?? 0) >= 100);
@@ -127,12 +132,14 @@ function RewardSheet({ row, onClose }: { row: RewardRow | null; onClose: () => v
           <Btn kind="secondary" onClick={onClose}>
             Cancel
           </Btn>
-          <Btn kind="primary" disabled={!ok || save.isPending} onClick={() => save.mutate(undefined)}>
+          <Btn kind="primary" disabled={!ok || save.isPending || uploading} onClick={() => save.mutate(undefined)}>
             {save.isPending ? "Saving…" : row ? "Save" : "Create"}
           </Btn>
         </>
       }
     >
+      <PhotoField id={row?.id ?? "new-reward"} name={name} value={imageUrl} onChange={setImageUrl} onBusy={setUploading} />
+      {!imageUrl && !fixed && productId && <div className="-mt-2 text-[12px] text-muted">No photo: LINE shows the product&apos;s photo.</div>}
       <Field label="Name" hint="Customers see this in LINE">
         <TextInput value={name} onChange={setName} placeholder="e.g. Free Hojicha Latte" autoFocus={!row} />
       </Field>
@@ -218,7 +225,12 @@ function ProgramTab() {
               )}
               {rewards.data!.map((r) => (
                 <tr key={r.id} style={{ opacity: r.is_active ? 1 : 0.6 }}>
-                  <td className={`${tdCls} font-semibold`}>{r.name}</td>
+                  <td className={tdCls}>
+                    <div className="flex items-center gap-2.5">
+                      <ItemPhoto id={r.id} name={r.name} imageUrl={r.image_url ?? r.product?.image_url ?? null} size="line" />
+                      <span className="font-semibold">{r.name}</span>
+                    </div>
+                  </td>
                   <td className={`${tdCls} mono`}>{r.cost_points} pts</td>
                   <td className={tdCls}>{rewardTypeText(r)}</td>
                   <td className={tdCls}>{r.is_active ? <Pill tone="PAID">Active</Pill> : <Pill tone="INACTIVE">Inactive</Pill>}</td>
