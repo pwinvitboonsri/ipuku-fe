@@ -34,7 +34,7 @@ export function orderReceipt(o: Order, settings: PrinterSettings, staff?: string
     footer: lines(settings.footer),
     discount: o.discount_satang > 0 ? { label: o.reward_code?.reward_name ?? "Discount", satang: o.discount_satang } : null,
     // unclaimed points QR only: once collected (or refunded) it's useless on paper
-    claim: o.claim_token?.url && !o.claim_token.claimed_at && o.status === "PAID" ? { url: o.claim_token.url, code: o.claim_token.display_code, points: o.claim_token.points } : null,
+    claim: o.claim_token?.url && !o.claim_token.claimed_at && o.status === "PAID" ? { url: o.claim_token.url, code: o.claim_token.display_code, points: o.claim_token.points, stamps: o.claim_token.stamps ?? 0 } : null,
   };
 }
 

@@ -10,7 +10,8 @@ import type { MenuOption, MenuProduct, Order, StockAlert, ValidatedReward } from
 
 // The cart lives on the device until Charge. Prices here are a preview; the server re-prices at create.
 
-export type CartLine = DisplayLine & { optionIds: string[] };
+// categoryId and optionDeltas let the reward preview apply category / free-option rules
+export type CartLine = DisplayLine & { optionIds: string[]; categoryId?: string | null; optionDeltas?: { id: string; delta: number }[] };
 export type Step = "sell" | "payment" | "success";
 export type CreateState = "creating" | "retry" | "error" | null;
 
@@ -38,6 +39,7 @@ export function linesFromOrder(o: Order): CartLine[] {
     name: i.product_name_snapshot,
     mods: i.order_item_modifier.map((m) => m.name_snapshot),
     optionIds: i.order_item_modifier.map((m) => m.modifier_option_id),
+    optionDeltas: i.order_item_modifier.map((m) => ({ id: m.modifier_option_id, delta: m.price_delta_satang })),
     qty: i.quantity,
     unitSatang: i.unit_price_satang,
     totalSatang: i.line_total_satang,
@@ -150,7 +152,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
         edit((ls) => {
           const same = ls.find((l) => l.productId === p.id && sameOptions(l.optionIds, optionIds));
           if (same) return ls.map((l) => (l === same ? { ...l, qty: l.qty + qty, totalSatang: l.unitSatang * (l.qty + qty) } : l));
-          return [...ls, { key: uuidv7(), productId: p.id, name: p.name, imageUrl: p.image_url, mods: options.map((o) => o.name), optionIds, qty, unitSatang: unit, totalSatang: unit * qty }];
+          return [
+            ...ls,
+            {
+              key: uuidv7(),
+              productId: p.id,
+              categoryId: p.categoryId,
+              name: p.name,
+              imageUrl: p.image_url,
+              mods: options.map((o) => o.name),
+              optionIds,
+              optionDeltas: options.map((o) => ({ id: o.id, delta: o.price_delta_satang })),
+              qty,
+              unitSatang: unit,
+              totalSatang: unit * qty,
+            },
+          ];
         });
       },
       setQty: (key, qty) => edit((ls) => ls.map((l) => (l.key === key ? { ...l, qty, totalSatang: l.unitSatang * qty } : l))),

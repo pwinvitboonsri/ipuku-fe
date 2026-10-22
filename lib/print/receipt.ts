@@ -25,7 +25,7 @@ export type Receipt = {
   // loyalty reward used on this order (a fixed discount set by the API)
   discount?: { label: string; satang: number } | null;
   // loyalty: one-time "scan with LINE to collect points" QR (same token as the success screen)
-  claim?: { url: string; code: string; points: number } | null;
+  claim?: { url: string; code: string; points: number; stamps?: number } | null;
 };
 export type ReceiptImages = { logo?: HTMLImageElement | null; bottom?: HTMLImageElement | null };
 
@@ -291,7 +291,8 @@ export function drawReceipt(r: Receipt, paper: PaperWidth = 80, images: ReceiptI
   if (r.claim) {
     p.rule();
     p.qr(r.claim.url, 220);
-    p.center(`สแกนด้วย LINE รับ ${r.claim.points} แต้ม`, 22, { weight: 600 });
+    const earn = [r.claim.points > 0 ? `${r.claim.points} แต้ม` : "", r.claim.stamps ? `${r.claim.stamps} แสตมป์` : ""].filter(Boolean).join(" + ");
+    p.center(`สแกนด้วย LINE รับ ${earn}`, 22, { weight: 600 });
     p.center(`หรือพิมพ์รหัส ${r.claim.code}`, 20, { family: p.f.mono });
   }
   return p.done();

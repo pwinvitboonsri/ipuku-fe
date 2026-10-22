@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { ApiError, api, errorText } from "@/lib/api";
 import { useCart } from "@/lib/cart";
 import { money } from "@/lib/format";
-import { rewardPreview } from "@/lib/loyalty";
+import { rewardNeeds, rewardPreviewResult, unitLabel } from "@/lib/loyalty";
 import type { ValidatedReward } from "@/lib/types";
 import { Btn } from "@/components/ui/btn";
 import { Spinner } from "@/components/ui/bits";
@@ -82,12 +82,22 @@ function Camera({ facing, onRead, paused }: { facing: "user" | "environment"; on
   );
 }
 
+// one line describing the rule, for the % / option / buy-X-get-Y types
+function rewardSummary(r: ValidatedReward): string {
+  const capText = r.max_discount_satang ? ` (max ${money(r.max_discount_satang)})` : "";
+  if (r.type === "PERCENT_OFF") return `${r.percent}% off${capText}`;
+  if (r.type === "FREE_OPTION") return `Free option${capText}`;
+  if (r.type === "BUY_X_GET_Y") return `Buy ${r.buy_qty} get ${r.get_qty}${r.get_percent === 100 ? " free" : ` ${r.get_percent}% off`}`;
+  return r.reward_name;
+}
+
 const ERRORS: Record<string, { title: string; body: string; tone: "neg" | "warn" | "off" }> = {
   USED: { title: "Code already used", body: "Ask the customer to check LINE — this reward was already redeemed.", tone: "neg" },
   APPLIED: { title: "Code is on another order", body: "It's attached to an open order. Void that order first, or take payment without the reward.", tone: "neg" },
   CANCELLED: { title: "Code was cancelled", body: "Ask the customer to tap the reward again in LINE for a fresh code.", tone: "warn" },
   EXPIRED: { title: "Code expired", body: "Ask the customer to tap the reward again in LINE for a fresh code.", tone: "warn" },
   STALE_QR: { title: "QR has changed", body: "The QR changes every 15 seconds — scan the customer's screen again (a screenshot won't work).", tone: "warn" },
+  NOT_ENOUGH: { title: "Not enough points", body: "The member's balance dropped (e.g. after a refund), so this reward can't be used now.", tone: "neg" },
   NOT_FOUND: { title: "Code not found", body: "Check the code on the customer's screen and try again.", tone: "warn" },
   INVALID: { title: "Not a reward code", body: "Scan the QR under the reward in the customer's LINE, or type its 6-character code.", tone: "warn" },
   OFFLINE: {
@@ -117,7 +127,8 @@ export function RewardScanSheet({ onClose }: { onClose: () => void }) {
   const known = reason ? ERRORS[reason] : undefined;
   const valid = check.data;
   const subtotal = cart.lines.reduce((s, l) => s + l.totalSatang, 0);
-  const preview = valid ? rewardPreview(valid, cart.lines, subtotal) : null;
+  const result = valid ? rewardPreviewResult(valid, cart.lines, subtotal) : null;
+  const preview = result?.ok ? result.amount : null;
 
   if (valid) {
     return (
@@ -145,7 +156,7 @@ export function RewardScanSheet({ onClose }: { onClose: () => void }) {
         <div>
           <div className="text-[20px] font-semibold text-ink">{valid.reward_name}</div>
           <div className="text-[13px] text-muted">
-            {valid.member.display_name ?? "Member"} · <span className="mono">{valid.member.label}</span> · {valid.cost_points} pts
+            {valid.member.display_name ?? "Member"} · <span className="mono">{valid.member.label}</span> · {valid.from_coupon ? "coupon" : `${valid.cost_points} ${unitLabel(valid.cost_currency)}`}
           </div>
         </div>
         <div className="flex flex-col gap-1.5 rounded-[12px] border border-line bg-card p-3.5 text-[13px]">
@@ -155,12 +166,18 @@ export function RewardScanSheet({ onClose }: { onClose: () => void }) {
               <b>{valid.product?.name ?? "—"}</b>
             </div>
           )}
+          {valid.type !== "FREE_ITEM" && valid.type !== "FIXED_DISCOUNT" && (
+            <div className="flex justify-between gap-3">
+              <span className="text-ink-2">Reward</span>
+              <b>{rewardSummary(valid)}</b>
+            </div>
+          )}
           <div className="flex justify-between gap-3">
             <span className="text-ink-2">Discount</span>
             <b className="mono">{preview === null ? "—" : `−${money(preview)}`}</b>
           </div>
           {preview === null ? (
-            <div className="text-[12px] font-medium text-persimmon-2">Add {valid.product?.name ?? "the item"} to the order first, then apply.</div>
+            <div className="text-[12px] font-medium text-persimmon-2">{result && !result.ok ? rewardNeeds(valid, result.reason) : "Not valid for this order"}, then apply.</div>
           ) : (
             <div className="text-[11.5px] text-muted">Amount is set by the reward. It can&apos;t be edited at the counter. Points are taken when the order is paid.</div>
           )}

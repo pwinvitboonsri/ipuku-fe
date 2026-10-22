@@ -85,7 +85,8 @@ const LockIcon = () => (
 );
 
 // LINE reward on this order: a locked discount line set by the reward (preview in the cart, server's on the order)
-export type PanelReward = { name: string; member: string; memberLabel: string; discount: number | null; product?: string | null };
+// needs: what the cart lacks for the reward to apply (preview only)
+export type PanelReward = { name: string; member: string; memberLabel: string; discount: number | null; needs?: string };
 
 function RewardLine({ reward, onRemove }: { reward: PanelReward; onRemove?: () => void }) {
   return (
@@ -93,7 +94,7 @@ function RewardLine({ reward, onRemove }: { reward: PanelReward; onRemove?: () =
       <div className="min-w-0">
         <div className="text-[14px] font-semibold">Reward · {reward.name}</div>
         <div className="text-[11.5px] text-muted">
-          {reward.discount === null ? <span className="font-medium text-persimmon-2">Add {reward.product ?? "the item"} to use this reward</span> : "Locked · set by reward, not editable"}
+          {reward.discount === null ? <span className="font-medium text-persimmon-2">{reward.needs ?? "Not valid for this order yet"}</span> : "Locked · set by reward, not editable"}
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">

@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { ClaimTokenInfo, Order } from "@/lib/types";
+import { earnText } from "@/lib/loyalty";
 import { Qr } from "@/components/ui/qr";
 
 const thaiExpiry = (iso: string) => new Date(iso).toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
@@ -30,7 +31,7 @@ export function ClaimPanel({ claim }: { claim: ClaimTokenInfo }) {
         <>
           <div className="pop flex h-[64px] w-[64px] items-center justify-center rounded-full bg-matcha text-[30px] font-bold">✓</div>
           <div className="text-[17px] font-bold">สะสมแต้มแล้ว</div>
-          <div className="mono text-[22px] font-semibold text-yuzu">+{claim.points} แต้ม</div>
+          <div className="mono text-[22px] font-semibold text-yuzu">{earnText(claim.points, claim.stamps)}</div>
           {claim.member && <div className="text-[12.5px] opacity-75">{claim.member.display_name ?? "Member"} · collected in LINE</div>}
         </>
       ) : (
@@ -40,7 +41,7 @@ export function ClaimPanel({ claim }: { claim: ClaimTokenInfo }) {
           <div className="rounded-[12px] bg-white p-2">
             <Qr value={claim.url!} size={168} />
           </div>
-          <div className="mono text-[22px] font-semibold text-yuzu">+{claim.points} แต้ม</div>
+          <div className="mono text-[22px] font-semibold text-yuzu">{earnText(claim.points, claim.stamps)}</div>
           <div className="text-[11px] leading-[1.5] opacity-70">
             รหัส <b className="mono">{claim.display_code}</b> · ใช้ได้ถึง {thaiExpiry(claim.expires_at)} · ครั้งเดียว
           </div>

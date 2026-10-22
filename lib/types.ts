@@ -79,19 +79,42 @@ export type Order = {
 
 type MemberRef = { member_no: number; display_name: string | null };
 // "Scan to collect points" QR for a paid walk-in order; url is null until LINE is set up on the API
-export type ClaimTokenInfo = { code: string; display_code: string; points: number; expires_at: string; claimed_at: string | null; member: MemberRef | null; url: string | null };
+export type ClaimTokenInfo = {
+  code: string;
+  display_code: string;
+  points: number;
+  stamps?: number;
+  expires_at: string;
+  claimed_at: string | null;
+  member: MemberRef | null;
+  url: string | null;
+};
+export type LoyaltyCurrency = "POINTS" | "STAMPS";
 export type RewardCodeStatus = "ACTIVE" | "APPLIED" | "USED" | "CANCELLED";
 export type OrderRewardInfo = { code: string; status: RewardCodeStatus; reward_name: string; cost_points: number; discount_satang: number | null; member: MemberRef };
 
 // POST /loyalty/reward-codes/validate
-export type RewardType = "FIXED_DISCOUNT" | "FREE_ITEM";
-export type ValidatedReward = {
-  code: string;
-  reward_name: string;
-  cost_points: number;
+export type RewardType = "FIXED_DISCOUNT" | "FREE_ITEM" | "PERCENT_OFF" | "FREE_OPTION" | "BUY_X_GET_Y";
+// the rule fields of a reward (ipuku-be reward-discount.function.ts)
+export type RewardRule = {
   type: RewardType;
   discount_satang: number | null;
   max_discount_satang: number | null;
+  percent: number | null;
+  min_spend_satang: number | null;
+  option_ids: string[];
+  product_ids: string[];
+  category_ids: string[];
+  buy_qty: number | null;
+  get_qty: number | null;
+  get_percent: number | null;
+};
+export type ValidatedReward = RewardRule & {
+  code: string;
+  reward_name: string;
+  cost_points: number;
+  cost_currency: LoyaltyCurrency;
+  from_coupon: boolean;
   product: { id: string; name: string } | null;
   expires_at: string;
   member: { label: string; display_name: string | null };
@@ -107,13 +130,14 @@ export type LoyaltyProgram = {
   update_at: string;
   claim_qr_enabled: boolean;
 };
-export type RewardRow = {
+export type RewardRow = RewardRule & {
   id: string;
   name: string;
   cost_points: number;
-  type: RewardType;
-  discount_satang: number | null;
-  max_discount_satang: number | null;
+  cost_currency: LoyaltyCurrency;
+  starts_at: string | null;
+  ends_at: string | null;
+  combine_with_promotions: boolean;
   sort_order: number;
   is_active: boolean;
   image_url: string | null;
@@ -125,14 +149,17 @@ export type LoyaltyMember = {
   display_name: string | null;
   picture_url: string | null;
   balance: number;
+  stamps: number;
+  birthday: { day: number; month: number } | null;
   visits: number;
   last_visit_at: string | null;
   joined_at: string;
 };
-export type PointsEntryType = "EARN" | "REDEEM" | "REVERSAL";
+export type PointsEntryType = "EARN" | "REDEEM" | "REVERSAL" | "BONUS" | "ADJUST" | "EXPIRE";
 export type PointsActivity = {
   id: string;
   type: PointsEntryType;
+  currency?: LoyaltyCurrency;
   points: number;
   note: string | null;
   create_at: string;
@@ -241,4 +268,41 @@ export type ShiftReport = {
   modifiers: { modifier_option_id: string; name: string; quantity: number; revenue_satang: number }[];
   staff: { staff_id: string; name: string; paid_orders: number; net_sales_satang: number; voids: number; refunds: number }[];
   hourly: { hour_start: string; orders: number; net_sales_satang: number }[];
+};
+
+// Back office → Loyalty → Earn rules (ipuku-be EarnRule)
+export type EarnRuleKind = "STAMPS_PER_VISIT" | "MULTIPLIER" | "BONUS";
+export type EarnRule = {
+  id: string;
+  name: string;
+  kind: EarnRuleKind;
+  is_active: boolean;
+  amount: number;
+  currency: LoyaltyCurrency;
+  multiplier_x10: number;
+  per_item: boolean;
+  min_spend_satang: number;
+  min_items: number;
+  product_ids: string[];
+  category_ids: string[];
+  weekdays: number[];
+  time_from: number | null;
+  time_to: number | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  stackable: boolean;
+  sort_order: number;
+};
+export type PerkKind = "WELCOME" | "BIRTHDAY";
+export type LoyaltyPerk = {
+  kind: PerkKind;
+  is_active: boolean;
+  trigger: "JOIN" | "FIRST_CLAIM";
+  grant_points: number;
+  grant_stamps: number;
+  coupon_valid_days: number;
+  send_message: boolean;
+  reward_id: string | null;
+  reward: { id: string; name: string } | null;
+  update_at?: string;
 };

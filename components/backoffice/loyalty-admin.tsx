@@ -3,35 +3,22 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, errorText } from "@/lib/api";
-import { bahtText, bo, parseBaht, useBoMutation, useProducts } from "@/lib/backoffice";
-import { clock, dateTime, money } from "@/lib/format";
-import type { LoyaltyMember, LoyaltyProgram, PointsActivity, PointsEntryType, RewardRow, RewardType } from "@/lib/types";
+import { bahtText, parseBaht, useBoMutation } from "@/lib/backoffice";
+import { clock, dateTime } from "@/lib/format";
+import type { LoyaltyCurrency, LoyaltyMember, LoyaltyProgram, PointsActivity, PointsEntryType } from "@/lib/types";
 import { Btn } from "@/components/ui/btn";
 import { Card, ErrorNote, PageHead, Pill, Spinner, labelCls } from "@/components/ui/bits";
 import { Field, TextInput } from "@/components/ui/form";
 import { FilterChips, Segmented } from "@/components/ui/glass-tabs";
 import { Sheet } from "@/components/ui/sheet";
 import { Table, tdCls, thCls } from "@/components/ui/table";
-import { ItemPhoto } from "@/components/counter/item-photo";
 import { Loadable, Select } from "./common";
-import { PhotoField } from "./photo-field";
+import { EarnRulesTab } from "./loyalty/earn-rules";
+import { PerksTab } from "./loyalty/perks";
+import { RewardsTab } from "./loyalty/rewards";
+import { int, keys } from "./loyalty/shared";
 
-// Back office → Loyalty (loyalty design, Flow 5): points rule + rewards, members, read-only activity log.
-
-const keys = {
-  program: [...bo.loyalty, "program"] as const,
-  rewards: [...bo.loyalty, "rewards"] as const,
-  members: (q: string) => [...bo.loyalty, "members", q] as const,
-  activity: (t: string) => [...bo.loyalty, "activity", t] as const,
-};
-
-const int = (s: string) => (/^\d+$/.test(s.trim()) ? Number(s.trim()) : null);
-
-function rewardTypeText(r: RewardRow) {
-  return r.type === "FIXED_DISCOUNT"
-    ? `Fixed ${money(r.discount_satang ?? 0)} off`
-    : `Free item · ${r.product?.name ?? "—"}${r.max_discount_satang ? ` (max ${money(r.max_discount_satang)})` : ""}`;
-}
+// Back office → Loyalty (loyalty design, Flow 5 + v2): base rule, earn rules, rewards, perks, members, activity log.
 
 // ── Program: points rule
 
@@ -42,7 +29,8 @@ function RuleCard({ program }: { program: LoyaltyProgram }) {
   const [minutes, setMinutes] = useState(String(program.reward_code_minutes));
   const next = { points_per_unit: int(points), unit_satang: parseBaht(unit), claim_valid_hours: int(hours), reward_code_minutes: int(minutes) };
   const changes = Object.fromEntries(Object.entries(next).filter(([k, v]) => v !== null && v !== program[k as keyof LoyaltyProgram]));
-  const valid = Object.values(next).every((v) => v !== null && v > 0);
+  // points per unit may be 0: no base points (e.g. a stamps-only program)
+  const valid = Object.entries(next).every(([k, v]) => v !== null && (k === "points_per_unit" ? v >= 0 : v > 0));
   const save = useBoMutation(() => api.post<LoyaltyProgram>("/loyalty/admin/program/update", changes), [keys.program]);
   const example = valid ? Math.floor(14500 / next.unit_satang!) * next.points_per_unit! : null;
 
@@ -90,167 +78,17 @@ function RuleCard({ program }: { program: LoyaltyProgram }) {
   );
 }
 
-// ── Program: reward sheet (create / edit)
-
-function RewardSheet({ row, onClose }: { row: RewardRow | null; onClose: () => void }) {
-  const products = useProducts();
-  const [name, setName] = useState(row?.name ?? "");
-  const [cost, setCost] = useState(row ? String(row.cost_points) : "");
-  const [type, setType] = useState<RewardType>(row?.type ?? "FREE_ITEM");
-  const [discount, setDiscount] = useState(row?.discount_satang ? bahtText(row.discount_satang) : "");
-  const [productId, setProductId] = useState(row?.product?.id ?? "");
-  const [maxDiscount, setMaxDiscount] = useState(row?.max_discount_satang ? bahtText(row.max_discount_satang) : "");
-  const [imageUrl, setImageUrl] = useState<string | null>(row?.image_url ?? null);
-  const [uploading, setUploading] = useState(false);
-  const fixed = type === "FIXED_DISCOUNT";
-
-  const discountSatang = parseBaht(discount);
-  const maxSatang = parseBaht(maxDiscount);
-  const body = {
-    name: name.trim(),
-    cost_points: int(cost),
-    type,
-    image_url: imageUrl,
-    ...(fixed ? { discount_satang: discountSatang } : { product_id: productId, max_discount_satang: maxSatang }),
-  };
-  const ok = body.name && body.cost_points && (fixed ? (discountSatang ?? 0) >= 100 : productId && (maxSatang ?? 0) >= 100);
-  const save = useBoMutation(() => api.post(row ? `/loyalty/admin/rewards/${row.id}/update` : "/loyalty/admin/rewards/create", body), [keys.rewards], { onSuccess: onClose });
-
-  const pick = (id: string) => {
-    setProductId(id);
-    const p = products.data?.find((x) => x.id === id);
-    // default cap: the product's base price (a bigger size or extra options are paid by the customer)
-    if (p && !maxDiscount) setMaxDiscount(bahtText(p.price_satang));
-  };
-
-  return (
-    <Sheet
-      title={row ? `Edit · ${row.name}` : "New reward"}
-      onClose={onClose}
-      footer={
-        <>
-          <Btn kind="secondary" onClick={onClose}>
-            Cancel
-          </Btn>
-          <Btn kind="primary" disabled={!ok || save.isPending || uploading} onClick={() => save.mutate(undefined)}>
-            {save.isPending ? "Saving…" : row ? "Save" : "Create"}
-          </Btn>
-        </>
-      }
-    >
-      <PhotoField id={row?.id ?? "new-reward"} name={name} value={imageUrl} onChange={setImageUrl} onBusy={setUploading} />
-      {!imageUrl && !fixed && productId && <div className="-mt-2 text-[12px] text-muted">No photo: LINE shows the product&apos;s photo.</div>}
-      <Field label="Name" hint="Customers see this in LINE">
-        <TextInput value={name} onChange={setName} placeholder="e.g. Free Hojicha Latte" autoFocus={!row} />
-      </Field>
-      <Field label="Points cost">
-        <TextInput value={cost} onChange={setCost} inputMode="numeric" suffix="pts" mono />
-      </Field>
-      <Field label="Type">
-        <Segmented<RewardType>
-          value={type}
-          onChange={setType}
-          options={[
-            { value: "FREE_ITEM", label: "Free item" },
-            { value: "FIXED_DISCOUNT", label: "Fixed ฿ off" },
-          ]}
-        />
-      </Field>
-      {fixed ? (
-        <Field label="Discount">
-          <TextInput value={discount} onChange={setDiscount} inputMode="decimal" prefix="฿" mono />
-        </Field>
-      ) : (
-        <>
-          <Field label="Item" hint="Any size or options; the order must contain it">
-            <Select value={productId} onChange={pick}>
-              <option value="">Choose a product…</option>
-              {(products.data ?? [])
-                .filter((p) => p.is_active || p.id === productId)
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} · {money(p.price_satang)}
-                  </option>
-                ))}
-            </Select>
-          </Field>
-          <Field label="Max discount" hint="The most this reward takes off (e.g. the regular size's price)">
-            <TextInput value={maxDiscount} onChange={setMaxDiscount} inputMode="decimal" prefix="฿" mono />
-          </Field>
-        </>
-      )}
-      <div className="text-[12px] text-muted">Discount is fixed here — baristas can&apos;t edit it at the counter. Codes customers already hold keep their old name and cost until they expire.</div>
-      {save.isError && <ErrorNote>{errorText(save.error)}</ErrorNote>}
-    </Sheet>
-  );
-}
-
 function ProgramTab() {
   const program = useQuery({ queryKey: keys.program, queryFn: () => api.get<LoyaltyProgram>("/loyalty/admin/program") });
-  const rewards = useQuery({ queryKey: keys.rewards, queryFn: () => api.get<RewardRow[]>("/loyalty/admin/rewards") });
-  const [sheet, setSheet] = useState<{ row: RewardRow | null } | null>(null);
-  const toggle = useBoMutation((r: RewardRow) => api.post(`/loyalty/admin/rewards/${r.id}/update-status`, { is_active: !r.is_active }), [keys.rewards]);
-
   return (
-    <Loadable queries={[program, rewards]}>
+    <Loadable queries={[program]}>
       {() => (
         <>
           {!program.data!.claim_qr_enabled && (
             <ErrorNote>Receipt QR is off: LINE isn&apos;t fully set up on the server (LINE_ENABLED / LINE_LIFF_ID). Paid orders won&apos;t get a points QR until it is.</ErrorNote>
           )}
           <RuleCard key={program.data!.update_at} program={program.data!} />
-          <div className="flex items-center justify-between gap-3">
-            <span className={labelCls}>Rewards</span>
-            <Btn kind="primary" size="sm" onClick={() => setSheet({ row: null })}>
-              + New reward
-            </Btn>
-          </div>
-          <Table minWidth={560}>
-            <thead>
-              <tr>
-                <th className={thCls}>Reward</th>
-                <th className={thCls}>Cost</th>
-                <th className={thCls}>Type</th>
-                <th className={thCls}>Status</th>
-                <th className={thCls} />
-              </tr>
-            </thead>
-            <tbody>
-              {rewards.data!.length === 0 && (
-                <tr>
-                  <td className={`${tdCls} text-muted`} colSpan={5}>
-                    No rewards yet. Add one so members have something to collect points for.
-                  </td>
-                </tr>
-              )}
-              {rewards.data!.map((r) => (
-                <tr key={r.id} style={{ opacity: r.is_active ? 1 : 0.6 }}>
-                  <td className={tdCls}>
-                    <div className="flex items-center gap-2.5">
-                      <ItemPhoto id={r.id} name={r.name} imageUrl={r.image_url ?? r.product?.image_url ?? null} size="line" />
-                      <span className="font-semibold">{r.name}</span>
-                    </div>
-                  </td>
-                  <td className={`${tdCls} mono`}>{r.cost_points} pts</td>
-                  <td className={tdCls}>{rewardTypeText(r)}</td>
-                  <td className={tdCls}>{r.is_active ? <Pill tone="PAID">Active</Pill> : <Pill tone="INACTIVE">Inactive</Pill>}</td>
-                  <td className={`${tdCls} text-right`}>
-                    <div className="flex justify-end gap-1.5">
-                      <Btn kind="ghost" size="sm" onClick={() => setSheet({ row: r })}>
-                        Edit
-                      </Btn>
-                      <Btn kind={r.is_active ? "dangerSoft" : "secondary"} size="sm" disabled={toggle.isPending} onClick={() => toggle.mutate(r)}>
-                        {r.is_active ? "Deactivate" : "Activate"}
-                      </Btn>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-          {toggle.isError && <ErrorNote>{errorText(toggle.error)}</ErrorNote>}
-          <div className="text-[12px] text-muted">Deactivating hides a reward in LINE; codes already issued still work until they expire.</div>
-          {sheet && <RewardSheet row={sheet.row} onClose={() => setSheet(null)} />}
+          <div className="text-[12px] text-muted">Extra points (double days, happy hour, bonus items) and stamps are set in Earn rules.</div>
         </>
       )}
     </Loadable>
@@ -259,7 +97,106 @@ function ProgramTab() {
 
 // ── Members
 
+// prefixes: refresh every search / filter
+const MEMBERS_ALL = keys.members("").slice(0, 3);
+const ACTIVITY_ALL = keys.activity("").slice(0, 3);
+
+function AdjustSheet({ member, onClose }: { member: LoyaltyMember; onClose: () => void }) {
+  const [currency, setCurrency] = useState<LoyaltyCurrency>("POINTS");
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const n = /^-?\d+$/.test(amount.trim()) ? Number(amount.trim()) : 0;
+  const save = useBoMutation(() => api.post(`/loyalty/admin/members/${member.id}/adjust`, { currency, amount: n, reason: reason.trim() }), [MEMBERS_ALL, ACTIVITY_ALL], {
+    onSuccess: onClose,
+  });
+  return (
+    <Sheet
+      title={`Adjust · ${member.display_name ?? member.label}`}
+      sub="A correction in the activity log, with your name and the reason. Use a minus sign to take away."
+      onClose={onClose}
+      footer={
+        <>
+          <Btn kind="secondary" onClick={onClose}>
+            Cancel
+          </Btn>
+          <Btn kind="primary" disabled={!n || !reason.trim() || save.isPending} onClick={() => save.mutate(undefined)}>
+            {save.isPending ? "Saving…" : "Adjust"}
+          </Btn>
+        </>
+      }
+    >
+      <Field label="Balance">
+        <Segmented<LoyaltyCurrency>
+          value={currency}
+          onChange={setCurrency}
+          options={[
+            { value: "POINTS", label: `Points (${member.balance})` },
+            { value: "STAMPS", label: `Stamps (${member.stamps})` },
+          ]}
+        />
+      </Field>
+      <Field label="Amount" hint="e.g. 20 or -20">
+        <TextInput value={amount} onChange={setAmount} inputMode="text" mono autoFocus />
+      </Field>
+      <Field label="Reason">
+        <TextInput value={reason} onChange={(v) => setReason(v.slice(0, 255))} placeholder="e.g. Receipt lost, scanned for the customer" />
+      </Field>
+      {save.isError && <ErrorNote>{errorText(save.error)}</ErrorNote>}
+    </Sheet>
+  );
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function BirthdaySheet({ member, onClose }: { member: LoyaltyMember; onClose: () => void }) {
+  const [day, setDay] = useState(member.birthday ? String(member.birthday.day) : "");
+  const [month, setMonth] = useState(member.birthday ? String(member.birthday.month) : "");
+  const both = int(day) && int(month);
+  const save = useBoMutation(
+    (clear: boolean) => api.post(`/loyalty/admin/members/${member.id}/birthday`, clear ? { birth_day: null, birth_month: null } : { birth_day: int(day), birth_month: int(month) }),
+    [MEMBERS_ALL],
+    { onSuccess: onClose },
+  );
+  return (
+    <Sheet
+      title={`Birthday · ${member.display_name ?? member.label}`}
+      sub="Members set it once when they join; only the owner can change it."
+      onClose={onClose}
+      footer={
+        <>
+          {member.birthday && (
+            <Btn kind="dangerSoft" disabled={save.isPending} onClick={() => save.mutate(true)}>
+              Clear
+            </Btn>
+          )}
+          <Btn kind="primary" disabled={!both || save.isPending} onClick={() => save.mutate(false)}>
+            Save
+          </Btn>
+        </>
+      }
+    >
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Day">
+          <TextInput value={day} onChange={setDay} inputMode="numeric" mono />
+        </Field>
+        <Field label="Month">
+          <Select value={month} onChange={setMonth}>
+            <option value="">—</option>
+            {MONTHS.map((m, i) => (
+              <option key={m} value={String(i + 1)}>
+                {m}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      </div>
+      {save.isError && <ErrorNote>{errorText(save.error)}</ErrorNote>}
+    </Sheet>
+  );
+}
+
 function MembersTab() {
+  const [sheet, setSheet] = useState<{ kind: "adjust" | "birthday"; member: LoyaltyMember } | null>(null);
   const [q, setQ] = useState("");
   const query = q.trim();
   const members = useQuery({
@@ -291,15 +228,18 @@ function MembersTab() {
               <th className={thCls}>Member</th>
               <th className={thCls}>ID</th>
               <th className={`${thCls} text-right`}>Points</th>
+              <th className={`${thCls} text-right`}>Stamps</th>
               <th className={thCls}>Last visit</th>
               <th className={`${thCls} text-right`}>Visits</th>
               <th className={thCls}>Joined</th>
+              <th className={thCls}>Birthday</th>
+              <th className={thCls} />
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td className={`${tdCls} text-muted`} colSpan={6}>
+                <td className={`${tdCls} text-muted`} colSpan={9}>
                   {query ? "No members match." : "No members yet. Customers join from the shop's LINE OA."}
                 </td>
               </tr>
@@ -319,25 +259,41 @@ function MembersTab() {
                 </td>
                 <td className={`${tdCls} mono`}>{m.label}</td>
                 <td className={`${tdCls} mono text-right font-semibold ${m.balance < 0 ? "text-persimmon-2" : ""}`}>{m.balance}</td>
+                <td className={`${tdCls} mono text-right`}>{m.stamps}</td>
                 <td className={tdCls}>{m.last_visit_at ? dateTime(m.last_visit_at) : "—"}</td>
                 <td className={`${tdCls} mono text-right`}>{m.visits}</td>
                 <td className={tdCls}>{new Date(m.joined_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</td>
+                <td className={tdCls}>
+                  <button type="button" className="tap underline decoration-line-2 underline-offset-2" onClick={() => setSheet({ kind: "birthday", member: m })}>
+                    {m.birthday ? `${m.birthday.day} ${MONTHS[m.birthday.month - 1]}` : "—"}
+                  </button>
+                </td>
+                <td className={`${tdCls} text-right`}>
+                  <Btn kind="ghost" size="sm" onClick={() => setSheet({ kind: "adjust", member: m })}>
+                    Adjust
+                  </Btn>
+                </td>
               </tr>
             ))}
           </tbody>
         </Table>
       )}
-      <div className="text-[12px] text-muted">Name and photo come from the member&apos;s LINE profile. Balance is computed from the activity log; visits are receipts claimed.</div>
+      <div className="text-[12px] text-muted">Name and photo come from the member&apos;s LINE profile. Balances are computed from the activity log; visits are receipts claimed.</div>
+      {sheet?.kind === "adjust" && <AdjustSheet member={sheet.member} onClose={() => setSheet(null)} />}
+      {sheet?.kind === "birthday" && <BirthdaySheet member={sheet.member} onClose={() => setSheet(null)} />}
     </>
   );
 }
 
 // ── Activity log (read-only ledger)
 
-const TYPE_PILL: Record<PointsEntryType, { tone: "PAID" | "OPEN" | "REFUNDED"; label: string }> = {
+const TYPE_PILL: Record<PointsEntryType, { tone: "PAID" | "OPEN" | "REFUNDED" | "neutral" | "LOW"; label: string }> = {
   EARN: { tone: "PAID", label: "Earn" },
   REDEEM: { tone: "OPEN", label: "Redeem" },
   REVERSAL: { tone: "REFUNDED", label: "Reversal" },
+  BONUS: { tone: "PAID", label: "Bonus" },
+  ADJUST: { tone: "neutral", label: "Adjust" },
+  EXPIRE: { tone: "LOW", label: "Expired" },
 };
 
 function ActivityTab() {
@@ -361,6 +317,8 @@ function ActivityTab() {
               { value: "EARN", label: "Earn" },
               { value: "REDEEM", label: "Redeem" },
               { value: "REVERSAL", label: "Reversal" },
+              { value: "BONUS", label: "Bonus" },
+              { value: "ADJUST", label: "Adjust" },
             ]}
           />
         </div>
@@ -402,6 +360,7 @@ function ActivityTab() {
                 </td>
                 <td className={`${tdCls} mono text-right font-semibold`} style={{ color: a.points >= 0 ? "var(--matcha)" : "var(--persimmon-2)" }}>
                   {a.points > 0 ? `+${a.points}` : a.points}
+                  {a.currency === "STAMPS" && <span className="ml-1 text-[11px] font-medium text-muted">stamps</span>}
                 </td>
                 <td className={tdCls}>{a.note ?? (a.order_number ? `#${a.order_number}` : "—")}</td>
                 <td className={tdCls}>{a.by}</td>
@@ -415,7 +374,7 @@ function ActivityTab() {
   );
 }
 
-type Tab = "program" | "members" | "activity";
+type Tab = "program" | "earn" | "rewards" | "perks" | "members" | "activity";
 
 export function LoyaltyAdmin() {
   const [tab, setTab] = useState<Tab>("program");
@@ -427,11 +386,26 @@ export function LoyaltyAdmin() {
         onChange={setTab}
         options={[
           { value: "program", label: "Program" },
+          { value: "earn", label: "Earn rules" },
+          { value: "rewards", label: "Rewards" },
+          { value: "perks", label: "Perks" },
           { value: "members", label: "Members" },
           { value: "activity", label: "Activity log" },
         ]}
       />
-      {tab === "program" ? <ProgramTab /> : tab === "members" ? <MembersTab /> : <ActivityTab />}
+      {tab === "program" ? (
+        <ProgramTab />
+      ) : tab === "earn" ? (
+        <EarnRulesTab />
+      ) : tab === "rewards" ? (
+        <RewardsTab />
+      ) : tab === "perks" ? (
+        <PerksTab />
+      ) : tab === "members" ? (
+        <MembersTab />
+      ) : (
+        <ActivityTab />
+      )}
     </div>
   );
 }
