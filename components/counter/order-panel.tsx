@@ -169,7 +169,7 @@ export function OrderPanel({
         </div>
       )}
       <div className="scroll min-h-0 flex-1 overflow-y-auto px-1 py-1.5" style={{ opacity: locked ? 0.92 : 1, touchAction: "pan-y" }}>
-        {!hasLines ? (
+        {!hasLines && !reward ? (
           <EmptyOrderState />
         ) : (
           <div className="flex flex-col gap-0.5">
@@ -206,9 +206,9 @@ export function OrderPanel({
           <button
             type="button"
             onClick={onClear}
-            disabled={!hasLines}
+            disabled={!hasLines && !reward}
             className="tap rounded-[12px] border border-line-2 bg-card px-[18px] py-[18px] text-[14px] font-semibold"
-            style={{ color: hasLines ? "var(--persimmon)" : "var(--muted-2)" }}
+            style={{ color: hasLines || reward ? "var(--persimmon)" : "var(--muted-2)" }}
           >
             Clear
           </button>
@@ -216,7 +216,8 @@ export function OrderPanel({
             <button
               type="button"
               onClick={onScanReward}
-              disabled={!hasLines || !canPay}
+              // scan first is fine: the reward waits on the order until its items are in
+              disabled={!canPay}
               className="tap rounded-[12px] border border-line-2 bg-card px-4 py-[18px] text-[14px] font-semibold text-ink disabled:text-muted-2"
             >
               {reward ? "⌗ Change reward" : "⌗ Scan reward"}

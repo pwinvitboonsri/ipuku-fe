@@ -14,7 +14,8 @@ function ruleLabel(g: MenuGroup) {
   return g.max === 1 ? "Optional" : `Optional · up to ${g.max}`;
 }
 
-export function ModifierModal({ item, onClose, onAdd }: { item: MenuProduct; onClose: () => void; onAdd: (options: MenuOption[], qty: number) => void }) {
+// note: shown when the item is added for a reward (e.g. "Free with reward · extras charged")
+export function ModifierModal({ item, onClose, onAdd, note }: { item: MenuProduct; onClose: () => void; onAdd: (options: MenuOption[], qty: number) => void; note?: string }) {
   const groups = item.groups;
   const [sel, setSel] = useState<Record<string, string[]>>(() => Object.fromEntries(groups.map((g) => [g.id, []])));
   const [qty, setQty] = useState(1);
@@ -45,7 +46,7 @@ export function ModifierModal({ item, onClose, onAdd }: { item: MenuProduct; onC
             <ItemPhoto id={item.id} name={item.name} imageUrl={item.image_url} size="hero" />
           </div>
           <div className="flex-1">
-            <div className="text-[11px] font-semibold tracking-[1.2px] text-muted">CUSTOMIZE</div>
+            <div className={`text-[11px] font-semibold tracking-[1.2px] ${note ? "text-matcha" : "text-muted"}`}>{note ?? "CUSTOMIZE"}</div>
             <div className="mt-0.5 text-[19px] font-semibold tracking-[-0.3px] text-ink sm:text-[22px]">{item.name}</div>
             <div className="mono mt-1.5 text-[13px] text-ink-2 sm:text-[14px]">
               {money(item.price_satang)} base<span className="hidden sm:inline"> · preview, server confirms</span>

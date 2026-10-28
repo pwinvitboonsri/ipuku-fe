@@ -118,6 +118,8 @@ export type ValidatedReward = RewardRule & {
   product: { id: string; name: string } | null;
   expires_at: string;
   member: { label: string; display_name: string | null };
+  /// held for this counter until then (scan first); after that it goes back to the customer
+  reserved_until?: string;
 };
 
 // ── Back office → Loyalty (/loyalty/admin/*)

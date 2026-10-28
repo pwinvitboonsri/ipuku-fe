@@ -30,6 +30,23 @@ function load(): Persisted {
   return { lines: [], pendingId: null, reward: null };
 }
 
+function lineOf(p: MenuProduct, options: MenuOption[], qty: number): CartLine {
+  const unit = p.price_satang + options.reduce((s, o) => s + o.price_delta_satang, 0);
+  return {
+    key: uuidv7(),
+    productId: p.id,
+    categoryId: p.categoryId,
+    name: p.name,
+    imageUrl: p.image_url,
+    mods: options.map((o) => o.name),
+    optionIds: options.map((o) => o.id),
+    optionDeltas: options.map((o) => ({ id: o.id, delta: o.price_delta_satang })),
+    qty,
+    unitSatang: unit,
+    totalSatang: unit * qty,
+  };
+}
+
 const sameOptions = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
 
 export function linesFromOrder(o: Order): CartLine[] {
@@ -64,7 +81,12 @@ type CartCtx = {
   remove: (key: string) => void;
   clear: () => void;
   setReward: (r: ValidatedReward | null) => void;
-  charge: () => void;
+  // take the reward off: it goes back to the customer's LINE
+  releaseReward: () => void;
+  // new options on one unit of a line (a free option from a reward); splits the line if qty > 1
+  setLineOptions: (key: string, p: MenuProduct, options: MenuOption[]) => void;
+  // withoutReward: the reward was just given back (state hasn't caught up yet)
+  charge: (opts?: { withoutReward?: boolean }) => void;
   retryCreate: () => void;
   freeRewardAndRetry: () => void;
   backToCart: () => void;
@@ -98,6 +120,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [lines, pendingId, reward]);
 
+  // a reward this counter holds goes back to the customer (best effort: an unused hold also runs out by itself)
+  const release = useCallback((r: ValidatedReward | null) => {
+    if (r) api.post(`/loyalty/reward-codes/${encodeURIComponent(r.code)}/release`).catch(() => {});
+  }, []);
+
   const edit = useCallback((fn: (ls: CartLine[]) => CartLine[]) => {
     setLines(fn);
     setPendingId(null);
@@ -126,11 +153,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   });
 
   const value = useMemo<CartCtx>(() => {
-    const startCreate = (id: string) => {
+    const startCreate = (id: string, withoutReward = false) => {
       setCreateState("creating");
       setCreateError(null);
       setHeldBy(null);
-      create.mutate({ id, lines, rewardCode: reward?.code ?? null });
+      create.mutate({ id, lines, rewardCode: withoutReward ? null : (reward?.code ?? null) });
     };
     const subtotal = lines.reduce((s, l) => s + l.totalSatang, 0);
     const discount = reward ? rewardPreview(reward, lines, subtotal) : null;
@@ -148,45 +175,45 @@ export function CartProvider({ children }: { children: ReactNode }) {
       pendingId,
       add: (p, options, qty) => {
         const optionIds = options.map((o) => o.id);
-        const unit = p.price_satang + options.reduce((s, o) => s + o.price_delta_satang, 0);
         edit((ls) => {
           const same = ls.find((l) => l.productId === p.id && sameOptions(l.optionIds, optionIds));
           if (same) return ls.map((l) => (l === same ? { ...l, qty: l.qty + qty, totalSatang: l.unitSatang * (l.qty + qty) } : l));
-          return [
-            ...ls,
-            {
-              key: uuidv7(),
-              productId: p.id,
-              categoryId: p.categoryId,
-              name: p.name,
-              imageUrl: p.image_url,
-              mods: options.map((o) => o.name),
-              optionIds,
-              optionDeltas: options.map((o) => ({ id: o.id, delta: o.price_delta_satang })),
-              qty,
-              unitSatang: unit,
-              totalSatang: unit * qty,
-            },
-          ];
+          return [...ls, lineOf(p, options, qty)];
         });
       },
+      setLineOptions: (key, p, options) =>
+        edit((ls) =>
+          ls.flatMap((l) => {
+            if (l.key !== key) return [l];
+            const changed = lineOf(p, options, 1);
+            return l.qty > 1 ? [{ ...l, qty: l.qty - 1, totalSatang: l.unitSatang * (l.qty - 1) }, changed] : [{ ...changed, key: l.key }];
+          }),
+        ),
       setQty: (key, qty) => edit((ls) => ls.map((l) => (l.key === key ? { ...l, qty, totalSatang: l.unitSatang * qty } : l))),
       remove: (key) => edit((ls) => ls.filter((l) => l.key !== key)),
       clear: () => {
         edit(() => []);
+        release(reward);
         setRewardState(null);
       },
       setReward: (r) => {
+        // a different reward replaces this one: give the old one back
+        if (reward && reward.code !== r?.code) release(reward);
         setRewardState(r);
         setPendingId(null);
       },
-      charge: () => {
+      releaseReward: () => {
+        release(reward);
+        setRewardState(null);
+        setPendingId(null);
+      },
+      charge: (opts) => {
         if (!lines.length) return;
-        const id = pendingId ?? uuidv7();
+        const id = (opts?.withoutReward ? null : pendingId) ?? uuidv7();
         setPendingId(id);
         setOrder(null);
         setStep("payment");
-        startCreate(id);
+        startCreate(id, opts?.withoutReward);
       },
       retryCreate: () => pendingId && startCreate(pendingId),
       freeRewardAndRetry: () => {
@@ -235,6 +262,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const fromThisCart = o.client_order_id === pendingId;
         setLines((ls) => (fromThisCart || !ls.length ? linesFromOrder(o) : [...ls, ...linesFromOrder(o)]));
         setPendingId(null);
+        // the void sent the reward back to the customer; hold it again for the edited order
+        if (fromThisCart && reward) {
+          api.post<ValidatedReward>("/loyalty/reward-codes/reserve", { input: reward.code }).then(setRewardState, () => setRewardState(null));
+        }
         setOrder(null);
         setStep("sell");
         qc.invalidateQueries({ queryKey: orderKeys.all });
@@ -244,7 +275,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setStep("sell");
       },
     };
-  }, [lines, reward, step, order, stockAlerts, createState, createError, heldBy, pendingId, create, edit, qc]);
+  }, [lines, reward, step, order, stockAlerts, createState, createError, heldBy, pendingId, create, edit, release, qc]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

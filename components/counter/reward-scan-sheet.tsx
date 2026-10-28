@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { ApiError, api, errorText } from "@/lib/api";
 import { useCart } from "@/lib/cart";
 import { money } from "@/lib/format";
-import { rewardNeeds, rewardPreviewResult, unitLabel } from "@/lib/loyalty";
+import { rewardAction, rewardActionText, rewardPreviewResult, unitLabel, type RewardAction } from "@/lib/loyalty";
+import { useMenu } from "@/lib/menu";
 import type { ValidatedReward } from "@/lib/types";
 import { Btn } from "@/components/ui/btn";
 import { Spinner } from "@/components/ui/bits";
@@ -93,6 +94,7 @@ function rewardSummary(r: ValidatedReward): string {
 
 const ERRORS: Record<string, { title: string; body: string; tone: "neg" | "warn" | "off" }> = {
   USED: { title: "Code already used", body: "Ask the customer to check LINE — this reward was already redeemed.", tone: "neg" },
+  CHANGED: { title: "Code just changed", body: "It was used or cancelled on the customer's phone a moment ago. Ask them to open it again.", tone: "warn" },
   APPLIED: { title: "Code is on another order", body: "It's attached to an open order. Void that order first, or take payment without the reward.", tone: "neg" },
   CANCELLED: { title: "Code was cancelled", body: "Ask the customer to tap the reward again in LINE for a fresh code.", tone: "warn" },
   EXPIRED: { title: "Code expired", body: "Ask the customer to tap the reward again in LINE for a fresh code.", tone: "warn" },
@@ -107,14 +109,16 @@ const ERRORS: Record<string, { title: string; body: string; tone: "neg" | "warn"
   },
 };
 
-// POS "Scan reward" (loyalty design, Flow 3 steps 4–5). Validating locks nothing: the reward is
-// attached when the order is created at Charge, and the server sets the discount.
-export function RewardScanSheet({ onClose }: { onClose: () => void }) {
+// POS "Scan reward" (loyalty design, Flow 3 steps 4–5), scan first: a valid code is held for this
+// counter right away, so items can be added after. Add to order puts it on the cart (and adds the free
+// item or option when there's one right answer); closing without adding gives it back to the customer.
+export function RewardScanSheet({ onClose, onApplied }: { onClose: () => void; onApplied: (r: ValidatedReward, action: RewardAction | null) => void }) {
   const cart = useCart();
+  const menu = useMenu();
   const [facing, setFacing] = useState<"user" | "environment">("user");
   const [typed, setTyped] = useState("");
 
-  const check = useMutation({ mutationFn: (input: string) => api.post<ValidatedReward>("/loyalty/reward-codes/validate", { input }) });
+  const check = useMutation({ mutationFn: (input: string) => api.post<ValidatedReward>("/loyalty/reward-codes/reserve", { input }) });
 
   function submit(input: string) {
     const value = input.trim();
@@ -126,33 +130,47 @@ export function RewardScanSheet({ onClose }: { onClose: () => void }) {
   const reason = err instanceof ApiError ? (err.status === 0 ? "OFFLINE" : err.code) : undefined;
   const known = reason ? ERRORS[reason] : undefined;
   const valid = check.data;
-  const subtotal = cart.lines.reduce((s, l) => s + l.totalSatang, 0);
-  const result = valid ? rewardPreviewResult(valid, cart.lines, subtotal) : null;
-  const preview = result?.ok ? result.amount : null;
+  // a held code that isn't added (closed, scan another) goes back to the customer — unless it's already the cart's
+  const giveBack = () => {
+    if (valid && valid.code !== cart.reward?.code) api.post(`/loyalty/reward-codes/${encodeURIComponent(valid.code)}/release`).catch(() => {});
+  };
+  const close = () => {
+    giveBack();
+    onClose();
+  };
 
   if (valid) {
+    const subtotal = cart.lines.reduce((s, l) => s + l.totalSatang, 0);
+    const result = rewardPreviewResult(valid, cart.lines, subtotal);
+    const action = rewardAction(valid, cart.lines, menu.data ?? []);
     return (
       <Sheet
         title="Reward"
-        onClose={onClose}
+        onClose={close}
         width={420}
         footer={
           <>
-            <Btn onClick={() => check.reset()}>Scan another</Btn>
             <Btn
-              kind="go"
-              disabled={preview === null}
               onClick={() => {
-                cart.setReward(valid);
-                onClose();
+                giveBack();
+                check.reset();
               }}
             >
-              Apply to order
+              Scan another
+            </Btn>
+            <Btn
+              kind="go"
+              onClick={() => {
+                cart.setReward(valid);
+                onApplied(valid, action);
+              }}
+            >
+              Add to order
             </Btn>
           </>
         }
       >
-        <span className="self-start rounded-full bg-matcha px-2.5 py-1 text-[11px] font-bold tracking-[0.6px] text-white">✓ VALID</span>
+        <span className="self-start rounded-full bg-matcha px-2.5 py-1 text-[11px] font-bold tracking-[0.6px] text-white">✓ VALID · HELD FOR THIS ORDER</span>
         <div>
           <div className="text-[20px] font-semibold text-ink">{valid.reward_name}</div>
           <div className="text-[13px] text-muted">
@@ -160,34 +178,25 @@ export function RewardScanSheet({ onClose }: { onClose: () => void }) {
           </div>
         </div>
         <div className="flex flex-col gap-1.5 rounded-[12px] border border-line bg-card p-3.5 text-[13px]">
-          {valid.type === "FREE_ITEM" && (
-            <div className="flex justify-between gap-3">
-              <span className="text-ink-2">Applies to</span>
-              <b>{valid.product?.name ?? "—"}</b>
-            </div>
-          )}
-          {valid.type !== "FREE_ITEM" && valid.type !== "FIXED_DISCOUNT" && (
+          {valid.type !== "FIXED_DISCOUNT" && (
             <div className="flex justify-between gap-3">
               <span className="text-ink-2">Reward</span>
-              <b>{rewardSummary(valid)}</b>
+              <b>{valid.type === "FREE_ITEM" ? `Free ${valid.product?.name ?? "item"}` : rewardSummary(valid)}</b>
             </div>
           )}
           <div className="flex justify-between gap-3">
-            <span className="text-ink-2">Discount</span>
-            <b className="mono">{preview === null ? "—" : `−${money(preview)}`}</b>
+            <span className="text-ink-2">Discount now</span>
+            <b className="mono">{result.ok ? `−${money(result.amount)}` : "—"}</b>
           </div>
-          {preview === null ? (
-            <div className="text-[12px] font-medium text-persimmon-2">{result && !result.ok ? rewardNeeds(valid, result.reason) : "Not valid for this order"}, then apply.</div>
-          ) : (
-            <div className="text-[11.5px] text-muted">Amount is set by the reward. It can&apos;t be edited at the counter. Points are taken when the order is paid.</div>
-          )}
+          <div className="text-[12px] font-medium text-ink-2">{rewardActionText(valid, action)}</div>
+          <div className="text-[11.5px] text-muted">The amount is set by the reward and can&apos;t be edited. Points are taken only when the order is paid; removing the reward gives it back.</div>
         </div>
       </Sheet>
     );
   }
 
   return (
-    <Sheet title="Scan reward" sub="From the customer's LINE · Rewards" onClose={onClose} width={440}>
+    <Sheet title="Scan reward" sub="From the customer's LINE · Rewards · scan before or after adding items" onClose={onClose} width={440}>
       {err ? (
         <div
           className="flex flex-col gap-2 rounded-[12px] border p-4"
