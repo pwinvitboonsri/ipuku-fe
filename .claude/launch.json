@@ -1,18 +1,43 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "ipuku-fe", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 3001 },
+    {
+      "name": "ipuku-fe",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3001
+    },
     {
       "name": "ipuku-be",
       "runtimeExecutable": "bash",
-      "runtimeArgs": ["-c", "cd ../ipuku-be && npm run start:dev"],
+      "runtimeArgs": [
+        "-c",
+        "cd ../ipuku-be && npm run start:dev"
+      ],
       "port": 3000
     },
     {
       "name": "ipuku-fe-cf-preview",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["opennextjs-cloudflare", "preview", "--port", "8787"],
+      "runtimeArgs": [
+        "opennextjs-cloudflare",
+        "preview",
+        "--port",
+        "8787"
+      ],
       "port": 8787
+    },
+    {
+      "name": "ipuku-liff-mock",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd ../ipuku-liff && npm run dev:mock -- --port 5173 --strictPort"
+      ],
+      "port": 5173
     }
   ]
 }
