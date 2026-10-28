@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
-import { Coffee, Gift, LayoutDashboard, Package, TrendingUp, Users, type LucideIcon } from "lucide-react";
+import { Coffee, Gift, LayoutDashboard, Loader2, Package, TrendingUp, Users, type LucideIcon } from "lucide-react";
 import { errorText } from "@/lib/api";
 import { useIngredients } from "@/lib/backoffice";
 import { qty } from "@/lib/format";
@@ -312,6 +312,11 @@ export function Dashboard() {
   const q = useDashboard(r);
   const ingredients = useIngredients();
   const D = q.data;
+  // a new range is loading while the last one's numbers stay on screen
+  const switching = q.isPlaceholderData;
+  // what's on screen: the range these numbers belong to (not the one being loaded)
+  const shown = D?.view ?? r;
+  const failed = q.isError && !!D;
 
   const choose = (k: RangeKey) => {
     setNow(new Date());
@@ -322,13 +327,13 @@ export function Dashboard() {
     if (!D) return null;
     return {
       D,
-      r,
+      r: shown,
       cur: sumDays(D.days, D.range.from, D.range.to),
       prev: sumDays(D.days, D.range.prev_from, D.range.prev_to),
       compare,
       narrow,
       now,
-      segs: segments(D, r, now),
+      segs: segments(D, shown, now),
       low: (ingredients.data ?? []).filter((i) => i.is_active && i.stock_quantity <= i.reorder_level),
       age: loyaltyAge(D, now),
       drill: setDrill,
@@ -338,28 +343,51 @@ export function Dashboard() {
       metric,
       setMetric,
     };
-  }, [D, r, compare, narrow, now, ingredients.data, metric, router]);
+  }, [D, shown, compare, narrow, now, ingredients.data, metric, router]);
 
   const Body = { overview: DashOverview, sales: DashSales, menu: DashMenu, customers: DashCustomers, rewards: DashRewards, stock: DashStock }[tab];
   const atRisk = c?.segs.atRisk.length ?? 0;
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 flex-col gap-3 border-b border-line bg-paper px-4 pb-3 pt-4 sm:px-[22px] sm:pt-[18px]">
+      <div className="relative flex shrink-0 flex-col gap-3 border-b border-line bg-paper px-4 pb-3 pt-4 sm:px-[22px] sm:pt-[18px]">
         <div className="flex flex-wrap items-end justify-between gap-3.5">
           <div className="min-w-0" style={{ flex: "1 1 300px" }}>
             <div className="text-[22px] font-semibold tracking-[-0.4px]">Dashboard</div>
-            <div className="mt-[3px] truncate text-[13px] text-muted">
-              <span className="font-semibold text-ink-2">{r.label}</span>
-              {compare && <> · vs {r.prevLabel}</>}
-              {q.isFetching && D && <span className="ml-2 text-muted-2">updating…</span>}
+            <div className="mt-[3px] flex min-w-0 items-center gap-1.5 truncate text-[13px] text-muted" aria-live="polite">
+              {switching ? (
+                <>
+                  <Loader2 size={14} strokeWidth={2.2} className="shrink-0 animate-spin text-persimmon" aria-hidden />
+                  <span className="truncate font-semibold text-ink-2">Loading {r.label}…</span>
+                </>
+              ) : (
+                <span className="truncate">
+                  <span className="font-semibold text-ink-2">{shown.label}</span>
+                  {compare && <> · vs {shown.prevLabel}</>}
+                </span>
+              )}
             </div>
           </div>
           <div className="flex max-w-full flex-wrap items-center gap-3">
             <ScrollRow selected={rangeKey} className="flex max-w-full">
               <GlassTabs<RangeKey>
                 size="sm"
-                items={RANGE_OPTS.map((o) => (o.id === "custom" && rangeKey === "custom" ? { id: "custom", label: thRange(custom.from, custom.to) } : o))}
+                items={RANGE_OPTS.map((o) => {
+                  const label = o.id === "custom" && rangeKey === "custom" ? thRange(custom.from, custom.to) : o.label;
+                  // the range just picked spins until its numbers arrive
+                  return {
+                    id: o.id,
+                    label:
+                      switching && o.id === rangeKey ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Loader2 size={13} strokeWidth={2.4} className="animate-spin" aria-hidden />
+                          {label}
+                        </span>
+                      ) : (
+                        label
+                      ),
+                  };
+                })}
                 value={rangeKey}
                 onChange={(k) => (k === "custom" ? setPickCustom(true) : choose(k))}
               />
@@ -373,10 +401,17 @@ export function Dashboard() {
         <ScrollRow selected={tab} className="flex max-w-full">
           <GlassTabs<DashTab> items={DASH_TABS.map((t) => ({ ...t, badge: t.id === "customers" && atRisk ? atRisk : 0 }))} value={tab} onChange={setTab} />
         </ScrollRow>
+        {/* thin running bar on the header's edge while a range loads */}
+        {(switching || (q.isFetching && !D)) && (
+          <div className="pointer-events-none absolute inset-x-0 z-10 overflow-hidden" style={{ bottom: -2, height: 3 }} role="progressbar" aria-label="Loading">
+            <div className="h-full w-1/3 rounded-full bg-persimmon" style={{ animation: "sheen 1.1s cubic-bezier(.4,0,.2,1) infinite" }} />
+          </div>
+        )}
       </div>
       <div key={tab} className="scroll fade-swap flex flex-1 flex-col gap-3.5 overflow-y-auto p-4 sm:p-[22px] [&>*]:shrink-0">
         {q.isError && !D ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+            <div className="text-[15px] font-semibold text-ink">Couldn&apos;t load {r.label}</div>
             <div className="text-[13px] text-persimmon-2">{errorText(q.error)}</div>
             <Btn onClick={() => q.refetch()}>Retry</Btn>
           </div>
@@ -386,7 +421,32 @@ export function Dashboard() {
           </div>
         ) : (
           <>
-            <Body c={c} />
+            {failed && (
+              <div className="flex flex-wrap items-center gap-3 rounded-[12px] border border-line px-4 py-3 text-[13px]" style={{ background: "#F6DED7", color: "#8E3522" }}>
+                <span className="flex-1">
+                  Couldn&apos;t load {r.label} · still showing <b>{shown.label}</b> · {errorText(q.error)}
+                </span>
+                <Btn size="sm" onClick={() => q.refetch()}>
+                  Retry
+                </Btn>
+              </div>
+            )}
+            {switching && (
+              <div className="pointer-events-none sticky top-0 z-[5] -mb-3.5 flex justify-center">
+                <span className="flex items-center gap-2 rounded-full border border-line bg-card px-3.5 py-1.5 text-[12.5px] font-semibold text-ink-2 shadow-md">
+                  <Loader2 size={14} strokeWidth={2.2} className="animate-spin text-persimmon" aria-hidden />
+                  Loading {r.label}…
+                </span>
+              </div>
+            )}
+            <div
+              className="flex flex-col gap-3.5 [&>*]:shrink-0"
+              // last range's numbers stay, faded and untouchable, until the new ones arrive
+              style={{ opacity: switching ? 0.42 : 1, pointerEvents: switching ? "none" : undefined, transition: "opacity 180ms ease", filter: switching ? "saturate(0.6)" : undefined }}
+              aria-busy={switching}
+            >
+              <Body c={c} />
+            </div>
             <div className="pb-2 pt-1 text-center text-[11.5px] text-muted">Revenue only · whole baht, rounded · Thailand time (UTC+7) · weeks start Monday</div>
           </>
         )}

@@ -59,6 +59,8 @@ export type DashMember = {
 export type DashEvent = { kind: "VOID" | "REFUND"; order_id: string | null; order_number: number | null; amount_satang: number; staff_name: string; at: string; reason: string | null };
 
 export type Dashboard = {
+  /// client side: the range these numbers are for (kept while the next range loads)
+  view: Range;
   range: { from: string; to: string; prev_from: string; prev_to: string; prev_until: string };
   now: string;
   program: { points_per_unit: number; unit_satang: number };
@@ -171,7 +173,9 @@ export function useDashboard(r: Range) {
   return useQuery({
     queryKey: dashKey(r),
     queryFn: () =>
-      api.get<Dashboard>("/report/dashboard", { from: r.from, to: r.to, prev_from: r.prevFrom, prev_to: r.prevTo, prev_until: r.prevUntil }),
+      api
+        .get<Omit<Dashboard, "view">>("/report/dashboard", { from: r.from, to: r.to, prev_from: r.prevFrom, prev_to: r.prevTo, prev_until: r.prevUntil })
+        .then((d): Dashboard => ({ ...d, view: r })),
     placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
