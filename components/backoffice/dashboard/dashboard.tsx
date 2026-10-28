@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { Coffee, Gift, LayoutDashboard, Package, TrendingUp, Users, type LucideIcon } from "lucide-react";
 import { errorText } from "@/lib/api";
 import { useIngredients } from "@/lib/backoffice";
 import { qty } from "@/lib/format";
@@ -42,13 +43,19 @@ import type { DashCtx, DashTab, Drill } from "./ctx";
 
 // Back office · Dashboard: range picker, compare toggle, section tabs, drill-down sheets (design: dash-app.jsx)
 
-const DASH_TABS: { id: DashTab; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "sales", label: "Sales" },
-  { id: "menu", label: "Menu" },
-  { id: "customers", label: "Customers" },
-  { id: "rewards", label: "Rewards" },
-  { id: "stock", label: "Stock" },
+const tabLabel = (I: LucideIcon, text: string) => (
+  <span className="inline-flex items-center gap-1.5">
+    <I size={15} strokeWidth={1.9} aria-hidden />
+    {text}
+  </span>
+);
+const DASH_TABS: { id: DashTab; label: ReactNode }[] = [
+  { id: "overview", label: tabLabel(LayoutDashboard, "Overview") },
+  { id: "sales", label: tabLabel(TrendingUp, "Sales") },
+  { id: "menu", label: tabLabel(Coffee, "Menu") },
+  { id: "customers", label: tabLabel(Users, "Customers") },
+  { id: "rewards", label: tabLabel(Gift, "Rewards") },
+  { id: "stock", label: tabLabel(Package, "Stock") },
 ];
 const RANGE_OPTS: { id: RangeKey; label: string }[] = [
   { id: "today", label: "Today" },

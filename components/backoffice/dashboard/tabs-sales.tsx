@@ -26,7 +26,8 @@ import {
   type Metric,
   type Point,
 } from "@/lib/dashboard";
-import { Avatar, BarChart, Delta, DTable, EmptyNote, Heatmap, KpiCard, Meter, MiniStat, Panel, SplitBar, dGrid } from "./kit";
+import { Banknote, Coffee, ChartColumn, ChartPie, Clock, CreditCard, Flame, PackageX, Receipt, ReceiptText, RotateCcw, ScanLine, SlidersHorizontal, Store, Tag, TrendingUp, Trophy, UserPlus, Hourglass, BellRing } from "lucide-react";
+import { Avatar, BarChart, Delta, DTable, EmptyNote, Heatmap, Ico, KpiCard, Meter, MiniStat, Panel, SplitBar, dGrid } from "./kit";
 import type { DashCtx } from "./ctx";
 
 // Dashboard tabs · Overview, Sales, Menu
@@ -37,6 +38,7 @@ function SalesByDay({ c }: { c: DashCtx }) {
   const hourly = r.from === r.to;
   return (
     <Panel
+      icon={hourly ? Clock : ChartColumn}
       title={hourly ? (r.key === "today" ? "Today by hour" : "By hour") : "By day"}
       sub={compare ? `Grey = ${hourly ? (r.key === "today" ? "yesterday" : "the day compared") : "same day in previous period"}` : null}
       right={
@@ -58,10 +60,10 @@ function SalesByDay({ c }: { c: DashCtx }) {
   );
 }
 
-function AttentionRow({ label, value, sub, tone, onClick }: { label: string; value: string; sub?: string; tone: "bad" | "warn" | "ok"; onClick: () => void }) {
+function AttentionRow({ label, value, sub, tone, icon, onClick }: { label: string; value: string; sub?: string; tone: "bad" | "warn" | "ok"; icon: typeof Clock; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className="tap flex w-full items-center gap-3 rounded-[10px] border border-line bg-paper px-3 py-[11px] text-left">
-      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: tone === "bad" ? "var(--persimmon)" : tone === "warn" ? "var(--yuzu)" : "var(--matcha)" }} />
+      <Ico icon={icon} tone={tone === "bad" ? "persimmon" : tone === "warn" ? "yuzu" : "matcha"} size={30} />
       <span className="flex min-w-0 flex-1 flex-col leading-[1.3]">
         <span className="text-[13.5px] font-semibold">{label}</span>
         {sub && <span className="text-[12px] text-muted">{sub}</span>}
@@ -77,11 +79,13 @@ export function DashOverview({ c }: { c: DashCtx }) {
   const young = age < 7;
   const cr = claimRate(cur);
   const kpis = [
-    { label: "Net sales", value: thb(cur.net_satang), cur: cur.net_satang, prev: prev.net_satang },
-    { label: "Orders", value: nfmt(cur.orders), cur: cur.orders, prev: prev.orders },
-    { label: "Average ticket", value: thb(avgTicket(cur)), cur: avgTicket(cur), prev: avgTicket(prev) },
-    { label: "Items sold", value: nfmt(cur.items), cur: cur.items, prev: prev.items },
+    { icon: Banknote, tone: "yuzu" as const, label: "Net sales", value: thb(cur.net_satang), cur: cur.net_satang, prev: prev.net_satang },
+    { icon: Receipt, tone: "ink" as const, label: "Orders", value: nfmt(cur.orders), cur: cur.orders, prev: prev.orders },
+    { icon: ReceiptText, tone: "cocoa" as const, label: "Average ticket", value: thb(avgTicket(cur)), cur: avgTicket(cur), prev: avgTicket(prev) },
+    { icon: Coffee, tone: "cocoa" as const, label: "Items sold", value: nfmt(cur.items), cur: cur.items, prev: prev.items },
     {
+      icon: ChartPie,
+      tone: "matcha" as const,
       label: "Member share of sales",
       value: pct(memberShare(cur)),
       cur: memberShare(cur),
@@ -90,7 +94,7 @@ export function DashOverview({ c }: { c: DashCtx }) {
       note: young ? (age ? `Grows as members claim receipts. Loyalty started ${age} day${age === 1 ? "" : "s"} ago.` : "Grows as members claim receipts.") : null,
       onClick: () => c.setTab("customers"),
     },
-    { label: "New members", value: nfmt(cur.new_members), cur: cur.new_members, prev: prev.new_members, onClick: () => c.drill({ type: "segment", seg: "new" }) },
+    { icon: UserPlus, tone: "matcha" as const, label: "New members", value: nfmt(cur.new_members), cur: cur.new_members, prev: prev.new_members, onClick: () => c.drill({ type: "segment", seg: "new" }) },
   ];
   return (
     <>
@@ -101,7 +105,7 @@ export function DashOverview({ c }: { c: DashCtx }) {
       </div>
       <SalesByDay c={c} />
       <div style={dGrid(narrow ? 1 : 3)}>
-        <Panel title="Channel" sub="Revenue by where the order came from">
+        <Panel icon={Store} title="Channel" sub="Revenue by where the order came from">
           <SplitBar
             items={[
               { label: "Walk-in", v: cur.walk_sales_satang, color: "var(--ink-2)", sub: `${nfmt(cur.walk_orders)} orders` },
@@ -109,7 +113,7 @@ export function DashOverview({ c }: { c: DashCtx }) {
             ]}
           />
         </Panel>
-        <Panel title="Receipt claim rate" sub="Walk-in receipts scanned by a member">
+        <Panel icon={ScanLine} tone="matcha" title="Receipt claim rate" sub="Walk-in receipts scanned by a member">
           {young && cur.claimed < 20 ? (
             <EmptyNote title={`${pct(cr)} so far`}>Claim rate grows as customers scan receipts. Point to the QR when you hand it over.</EmptyNote>
           ) : (
@@ -127,11 +131,11 @@ export function DashOverview({ c }: { c: DashCtx }) {
             </>
           )}
         </Panel>
-        <Panel title="Needs a look" pad={12}>
+        <Panel icon={BellRing} tone="persimmon" title="Needs a look" pad={12}>
           <div className="flex flex-col gap-1.5">
-            <AttentionRow label="Low stock" sub="At or below reorder level" value={nfmt(low.length)} tone={low.some((i) => i.stock_quantity < 0) ? "bad" : low.length ? "warn" : "ok"} onClick={() => c.drill({ type: "lowstock" })} />
-            <AttentionRow label="Members at risk" sub="No visit in 30–60 days" value={nfmt(segs.atRisk.length)} tone={segs.atRisk.length ? "warn" : "ok"} onClick={() => c.drill({ type: "segment", seg: "atRisk" })} />
-            <AttentionRow label="Refunds & voids" sub={thb(cur.refund_satang + cur.void_satang)} value={nfmt(cur.refunds + cur.voids)} tone={cur.refunds ? "warn" : "ok"} onClick={() => c.drill({ type: "refunds" })} />
+            <AttentionRow icon={PackageX} label="Low stock" sub="At or below reorder level" value={nfmt(low.length)} tone={low.some((i) => i.stock_quantity < 0) ? "bad" : low.length ? "warn" : "ok"} onClick={() => c.drill({ type: "lowstock" })} />
+            <AttentionRow icon={Hourglass} label="Members at risk" sub="No visit in 30–60 days" value={nfmt(segs.atRisk.length)} tone={segs.atRisk.length ? "warn" : "ok"} onClick={() => c.drill({ type: "segment", seg: "atRisk" })} />
+            <AttentionRow icon={RotateCcw} label="Refunds & voids" sub={thb(cur.refund_satang + cur.void_satang)} value={nfmt(cur.refunds + cur.voids)} tone={cur.refunds ? "warn" : "ok"} onClick={() => c.drill({ type: "refunds" })} />
           </div>
         </Panel>
       </div>
@@ -148,11 +152,11 @@ export function DashSales({ c }: { c: DashCtx }) {
   return (
     <>
       <SalesByDay c={c} />
-      <Panel title="Busiest times" sub={`Orders by hour and weekday · ${r.label}`}>
+      <Panel icon={Flame} tone="persimmon" title="Busiest times" sub={`Orders by hour and weekday · ${r.label}`}>
         <Heatmap grid={heat.grid} hours={heat.hours} />
       </Panel>
       <div style={dGrid(narrow ? 1 : 2)}>
-        <Panel title="Channel split">
+        <Panel icon={Store} title="Channel split">
           <span className={labelCls}>Revenue</span>
           <SplitBar
             items={[
@@ -174,7 +178,7 @@ export function DashSales({ c }: { c: DashCtx }) {
             </span>
           )}
         </Panel>
-        <Panel title="Payment mix" sub="Money taken, after refunds">
+        <Panel icon={CreditCard} tone="matcha" title="Payment mix" sub="Money taken, after refunds">
           <SplitBar
             items={[
               { label: "PromptPay", v: cur.promptpay_satang, color: "var(--persimmon)" },
@@ -188,7 +192,7 @@ export function DashSales({ c }: { c: DashCtx }) {
             </div>
           )}
         </Panel>
-        <Panel title="Discounts given" sub="Rewards and coupons redeemed at the counter">
+        <Panel icon={Tag} tone="yuzu" title="Discounts given" sub="Rewards and coupons redeemed at the counter">
           {cur.discount_satang < 100 ? (
             <EmptyNote title="No discounts yet">Appear once members start redeeming rewards and coupons.</EmptyNote>
           ) : (
@@ -214,6 +218,8 @@ export function DashSales({ c }: { c: DashCtx }) {
           )}
         </Panel>
         <Panel
+          icon={RotateCcw}
+          tone="persimmon"
           title="Refunds & voids"
           right={
             D.events.length > 0 && (
@@ -287,7 +293,7 @@ export function DashMenu({ c }: { c: DashCtx }) {
 
   if (all.length === 0) {
     return (
-      <Panel title="Products">
+      <Panel icon={Trophy} tone="yuzu" title="Products">
         <EmptyNote title="Nothing sold in this range">Products show up here once orders are paid.</EmptyNote>
       </Panel>
     );
@@ -295,6 +301,8 @@ export function DashMenu({ c }: { c: DashCtx }) {
   return (
     <>
       <Panel
+        icon={Trophy}
+        tone="yuzu"
         title={`${end === "top" ? "Top" : "Bottom"} products`}
         sub="Tap a product to see its trend"
         pad={0}
@@ -332,15 +340,15 @@ export function DashMenu({ c }: { c: DashCtx }) {
       </Panel>
       <div style={dGrid(narrow ? 1 : 2)}>
         {sel && (
-          <Panel title={sel.name} sub={`Sold per ${r.from === r.to ? "hour" : "day"} · ${nfmt(sel.quantity)} in range`}>
+          <Panel icon={TrendingUp} title={sel.name} sub={`Sold per ${r.from === r.to ? "hour" : "day"} · ${nfmt(sel.quantity)} in range`}>
             <BarChart data={productTrend(c, sel.product_id)} fmt={(v) => `${nfmt(v)} sold`} compare={compare} height={120} caption="Tap a bar" />
           </Panel>
         )}
-        <Panel title="Category mix" sub="Share of revenue">
+        <Panel icon={ChartPie} tone="cocoa" title="Category mix" sub="Share of revenue">
           <SplitBar items={[...cats.values()].sort((a, b) => b.v - a.v).map((x, i) => ({ label: x.label, v: x.v, color: CAT_COLORS[i % CAT_COLORS.length] }))} />
         </Panel>
       </div>
-      <Panel title="Options" sub="How often an option is picked on the items that offer it, and what it adds" pad={0}>
+      <Panel icon={SlidersHorizontal} tone="cocoa" title="Options" sub="How often an option is picked on the items that offer it, and what it adds" pad={0}>
         <div className="h-3" />
         {options.length === 0 ? (
           <div className="px-4 pb-4">

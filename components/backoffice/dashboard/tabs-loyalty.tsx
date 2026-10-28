@@ -26,10 +26,18 @@ import {
   type DashMember,
   type SegKey,
 } from "@/lib/dashboard";
-import { Avatar, BarChart, Delta, DivergingBars, DTable, EmptyNote, KpiCard, Meter, MiniStat, Panel, dGrid, type Col } from "./kit";
+import { CalendarRange, Cake, Coins, Crown, Gift, Layers, MessageCircle, PackageX, Repeat, Scale, ScanLine, Sparkles, Stamp, Ticket, Trash2, UserCog, UserMinus, UserPlus, Users, Hourglass, UserX, Heart } from "lucide-react";
+import { Avatar, BarChart, Delta, DivergingBars, DTable, EmptyNote, Ico, KpiCard, Meter, MiniStat, Panel, dGrid, type Col, type Tone } from "./kit";
 import type { DashCtx } from "./ctx";
 
 // Dashboard tabs · Customers, Rewards, Stock
+
+const SEG_ICON: Record<SegKey, { icon: typeof Users; tone: Tone }> = {
+  new: { icon: Sparkles, tone: "matcha" },
+  regular: { icon: Heart, tone: "ink" },
+  atRisk: { icon: Hourglass, tone: "yuzu" },
+  lapsed: { icon: UserX, tone: "persimmon" },
+};
 
 const AV = ["#A8B86C", "#C8553D", "#D4A537", "#6B7F4A", "#A06B3E", "#8A8378", "#3A332B", "#B8A968"];
 export const memberColor = (m: DashMember) => AV[m.member_no % AV.length];
@@ -74,13 +82,13 @@ export function DashCustomers({ c }: { c: DashCtx }) {
   return (
     <>
       <div className="stagger" style={dGrid(narrow ? 2 : 4)}>
-        <KpiCard label="LINE friends" value={nfmt(D.friends)} cur={D.friends} prev={D.prev_friends} compare={compare} foot={`+${nfmt(cur.new_friends)} in range`} />
-        <KpiCard label="Members" value={nfmt(D.members_total)} cur={D.members_total} prev={D.prev_members_total} compare={compare} foot={D.friends ? `${pct(sdiv(D.members_total, D.friends))} of friends` : null} />
-        <KpiCard label="New members" value={nfmt(cur.new_members)} cur={cur.new_members} prev={prev.new_members} compare={compare} onClick={() => c.drill({ type: "segment", seg: "new" })} />
-        <KpiCard label="Unfollows" value={nfmt(cur.unfollows)} cur={cur.unfollows} prev={prev.unfollows} compare={compare} invert foot={D.friends ? `${pct(sdiv(cur.unfollows, D.friends), 1)} of friends` : null} />
+        <KpiCard icon={MessageCircle} tone="matcha" label="LINE friends" value={nfmt(D.friends)} cur={D.friends} prev={D.prev_friends} compare={compare} foot={`+${nfmt(cur.new_friends)} in range`} />
+        <KpiCard icon={Users} tone="matcha" label="Members" value={nfmt(D.members_total)} cur={D.members_total} prev={D.prev_members_total} compare={compare} foot={D.friends ? `${pct(sdiv(D.members_total, D.friends))} of friends` : null} />
+        <KpiCard icon={UserPlus} tone="matcha" label="New members" value={nfmt(cur.new_members)} cur={cur.new_members} prev={prev.new_members} compare={compare} onClick={() => c.drill({ type: "segment", seg: "new" })} />
+        <KpiCard icon={UserMinus} tone="persimmon" label="Unfollows" value={nfmt(cur.unfollows)} cur={cur.unfollows} prev={prev.unfollows} compare={compare} invert foot={D.friends ? `${pct(sdiv(cur.unfollows, D.friends), 1)} of friends` : null} />
       </div>
       <div style={dGrid(narrow ? 1 : 2)}>
-        <Panel title="Receipt claim rate" sub="Share of walk-in receipts whose QR a member scanned">
+        <Panel icon={ScanLine} tone="matcha" title="Receipt claim rate" sub="Share of walk-in receipts whose QR a member scanned">
           <div className="flex flex-wrap items-baseline gap-2.5">
             <span className="mono text-[34px] font-semibold tracking-[-0.6px]">{pct(cr)}</span>
             {compare && <Delta cur={cr} prev={claimRate(prev)} mode="pts" />}
@@ -94,7 +102,7 @@ export function DashCustomers({ c }: { c: DashCtx }) {
             <BarChart data={series(D, r, "claim", now)} fmt={(v) => pct(v)} compare={compare} height={110} color="var(--persimmon)" caption="Tap a day" />
           )}
         </Panel>
-        <Panel title={r.len <= 14 ? "New members per day" : "New members per week"} sub="Weeks start Monday">
+        <Panel icon={UserPlus} tone="matcha" title={r.len <= 14 ? "New members per day" : "New members per week"} sub="Weeks start Monday">
           {D.members_total < 1 ? (
             <EmptyNote title="No members yet">Members appear when a customer scans a receipt QR and joins via LINE.</EmptyNote>
           ) : (
@@ -103,7 +111,7 @@ export function DashCustomers({ c }: { c: DashCtx }) {
         </Panel>
       </div>
       <div style={dGrid(narrow ? 1 : 2)}>
-        <Panel title="Members vs non-members" sub="Non-members include Grab and unclaimed receipts" pad={0}>
+        <Panel icon={Users} tone="matcha" title="Members vs non-members" sub="Non-members include Grab and unclaimed receipts" pad={0}>
           <div className="h-3" />
           <DTable
             rows={[
@@ -129,7 +137,7 @@ export function DashCustomers({ c }: { c: DashCtx }) {
             ]}
           />
         </Panel>
-        <Panel title="Visit behaviour" asOf="All members">
+        <Panel icon={Repeat} tone="matcha" title="Visit behaviour" asOf="All members">
           {age < 14 || rep.length === 0 ? (
             <EmptyNote title="Needs a couple of weeks">Repeat rate and time between visits show up once members come back.</EmptyNote>
           ) : (
@@ -141,7 +149,7 @@ export function DashCustomers({ c }: { c: DashCtx }) {
           )}
         </Panel>
       </div>
-      <Panel title="Segments" sub="Tap a group to see who's in it" asOf>
+      <Panel icon={Layers} tone="matcha" title="Segments" sub="Tap a group to see who's in it" asOf>
         <div className="stagger" style={dGrid(narrow ? 2 : 4, 10)}>
           {(Object.keys(SEG_META) as SegKey[]).map((k) => {
             const s = SEG_META[k];
@@ -149,7 +157,7 @@ export function DashCustomers({ c }: { c: DashCtx }) {
             return (
               <button key={k} type="button" onClick={() => c.drill({ type: "segment", seg: k })} className="tap flex flex-col gap-1.5 rounded-[12px] border border-line bg-paper px-3.5 py-3 text-left">
                 <span className="flex items-center gap-2 text-[13px] font-semibold">
-                  <span className="h-2 w-2 rounded-full" style={{ background: s.tone }} />
+                  <Ico icon={SEG_ICON[k].icon} tone={SEG_ICON[k].tone} />
                   {s.label}
                   <span className="ml-auto text-muted-2">›</span>
                 </span>
@@ -163,7 +171,7 @@ export function DashCustomers({ c }: { c: DashCtx }) {
         </div>
       </Panel>
       <div style={{ ...dGrid(narrow ? 1 : 5), alignItems: "start" }}>
-        <Panel title="Top members" sub="By total spend" asOf pad={0} style={{ gridColumn: narrow ? "auto" : "span 3" }}>
+        <Panel icon={Crown} tone="yuzu" title="Top members" sub="By total spend" asOf pad={0} style={{ gridColumn: narrow ? "auto" : "span 3" }}>
           <div className="h-3" />
           {top.length ? (
             <DTable rows={top.map((m) => ({ ...m, key: m.id }))} onRow={(m) => c.drill({ type: "member", m })} cols={memberCols(now)} minWidth={520} />
@@ -173,7 +181,7 @@ export function DashCustomers({ c }: { c: DashCtx }) {
             </div>
           )}
         </Panel>
-        <Panel title={`Birthdays in ${TH_MON[month - 1]}`} sub="Birthday coupon status" style={{ gridColumn: narrow ? "auto" : "span 2" }}>
+        <Panel icon={Cake} tone="persimmon" title={`Birthdays in ${TH_MON[month - 1]}`} sub="Birthday coupon status" style={{ gridColumn: narrow ? "auto" : "span 2" }}>
           {bdays.length === 0 ? (
             <EmptyNote title="No birthdays this month">Members can add their birthday when they join in LINE.</EmptyNote>
           ) : (
@@ -193,7 +201,7 @@ export function DashCustomers({ c }: { c: DashCtx }) {
           )}
         </Panel>
       </div>
-      <Panel title="Cohort retention" sub="Members who joined in a month, and the share who came back in the months after" pad={0}>
+      <Panel icon={CalendarRange} tone="matcha" title="Cohort retention" sub="Members who joined in a month, and the share who came back in the months after" pad={0}>
         <div className="h-3" />
         {D.cohorts.length === 0 || age < 32 ? (
           <div className="px-4 pb-4">
@@ -253,7 +261,7 @@ export function DashRewards({ c }: { c: DashCtx }) {
   return (
     <>
       <div style={dGrid(narrow ? 1 : 2)}>
-        <Panel title="Points" sub={`${D.program.points_per_unit} point${D.program.points_per_unit === 1 ? "" : "s"} per ฿${nfmt(unit)} spent`}>
+        <Panel icon={Coins} tone="yuzu" title="Points" sub={`${D.program.points_per_unit} point${D.program.points_per_unit === 1 ? "" : "s"} per ฿${nfmt(unit)} spent`}>
           <div style={dGrid(3)}>
             <MiniStat label="Issued" value={nfmt(cur.points_issued)} sub="in range" />
             <MiniStat label="Redeemed" value={nfmt(cur.points_redeemed)} sub={`${pct(sdiv(cur.points_redeemed, cur.points_issued))} of issued`} />
@@ -265,7 +273,7 @@ export function DashRewards({ c }: { c: DashCtx }) {
             </div>
           )}
         </Panel>
-        <Panel title="Stamps" sub="From stamp earn rules">
+        <Panel icon={Stamp} tone="yuzu" title="Stamps" sub="From stamp earn rules">
           {cur.stamps_issued + D.stamps_outstanding === 0 ? (
             <EmptyNote title="No stamps yet">Add a stamps rule in Loyalty → Earn rules to start a stamp card.</EmptyNote>
           ) : (
@@ -277,7 +285,7 @@ export function DashRewards({ c }: { c: DashCtx }) {
           )}
         </Panel>
       </div>
-      <Panel title="Rewards redeemed" sub="Most popular first · discount is what the shop gave up" pad={0}>
+      <Panel icon={Gift} tone="yuzu" title="Rewards redeemed" sub="Most popular first · discount is what the shop gave up" pad={0}>
         <div className="h-3" />
         {D.rewards.length === 0 ? (
           <div className="px-4 pb-4">
@@ -308,7 +316,7 @@ export function DashRewards({ c }: { c: DashCtx }) {
         )}
       </Panel>
       <div style={dGrid(narrow ? 1 : 2)}>
-        <Panel title="Coupons by source" sub={`Issued in range · coupon discounts ${thb(D.coupon_discount_satang)}`}>
+        <Panel icon={Ticket} tone="yuzu" title="Coupons by source" sub={`Issued in range · coupon discounts ${thb(D.coupon_discount_satang)}`}>
           {D.coupons.every((k) => k.issued === 0) ? (
             <EmptyNote title="No coupons issued in this range">Welcome and birthday perks hand out coupons automatically.</EmptyNote>
           ) : (
@@ -343,7 +351,7 @@ export function DashRewards({ c }: { c: DashCtx }) {
             </>
           )}
         </Panel>
-        <Panel title="Earn rules" sub="Extra points and stamps each rule gave on claimed receipts" pad={0}>
+        <Panel icon={Sparkles} tone="yuzu" title="Earn rules" sub="Extra points and stamps each rule gave on claimed receipts" pad={0}>
           <div className="h-3" />
           {ruleRows.length === 0 ? (
             <div className="px-4 pb-4">
@@ -391,6 +399,8 @@ export function DashStock({ c }: { c: DashCtx }) {
     <>
       <div style={{ ...dGrid(narrow ? 1 : 2), alignItems: "start" }}>
         <Panel
+          icon={PackageX}
+          tone="persimmon"
           title="Low stock"
           sub="At or below reorder level"
           asOf
@@ -419,7 +429,7 @@ export function DashStock({ c }: { c: DashCtx }) {
             />
           )}
         </Panel>
-        <Panel title="Waste" sub={`${nfmt(cur.waste_entries)} waste entr${cur.waste_entries === 1 ? "y" : "ies"} in range`}>
+        <Panel icon={Trash2} tone="persimmon" title="Waste" sub={`${nfmt(cur.waste_entries)} waste entr${cur.waste_entries === 1 ? "y" : "ies"} in range`}>
           <BarChart data={series(D, r, "waste", now)} fmt={(v) => `${nfmt(v)} entries`} compare={compare} height={90} color="var(--persimmon-2)" caption="Tap a day" />
           <span className={labelCls}>Most wasted</span>
           {D.waste.length === 0 ? (
@@ -435,7 +445,7 @@ export function DashStock({ c }: { c: DashCtx }) {
           )}
         </Panel>
       </div>
-      <Panel title="Staff" sub="Who rang up the paid orders · voids and refunds by who did them" pad={0}>
+      <Panel icon={UserCog} title="Staff" sub="Who rang up the paid orders · voids and refunds by who did them" pad={0}>
         <div className="h-3" />
         {D.staff.length === 0 ? (
           <div className="px-4 pb-4">
@@ -466,6 +476,7 @@ export function DashStock({ c }: { c: DashCtx }) {
         )}
       </Panel>
       <Panel
+        icon={Scale}
         title="Cash variance per shift"
         sub={shifts.length ? `${short.length} of ${shifts.length} shift${shifts.length === 1 ? "" : "s"} short · total ${thb(shifts.reduce((s, x) => s + x.v, 0))}` : null}
         right={

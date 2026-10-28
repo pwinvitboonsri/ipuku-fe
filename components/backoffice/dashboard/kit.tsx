@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState, type CSSProperties, type ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import { Card, labelCls } from "@/components/ui/bits";
 import { tdCls, thCls } from "@/components/ui/table";
 import { ScrollRow } from "@/components/ui/scroll-row";
@@ -10,6 +11,24 @@ import { DOW_MON, nfmt, pct, sdiv, thb, type Point } from "@/lib/dashboard";
 
 const TONE = { up: { bg: "#E3E9D6", fg: "#44552A" }, down: { bg: "#F6DED7", fg: "#8E3522" }, flat: { bg: "var(--paper-2)", fg: "var(--muted)" } };
 const deltaCss = (t: keyof typeof TONE): CSSProperties => ({ background: TONE[t].bg, color: TONE[t].fg, fontSize: 11.5, fontWeight: 600, padding: "2px 7px", borderRadius: 999, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 3 });
+// Icon tones by topic, so cards read apart at a glance: sales · customers · rewards · needs attention · neutral
+export type Tone = "ink" | "matcha" | "yuzu" | "persimmon" | "cocoa" | "muted";
+const TONE_COLOR: Record<Tone, string> = { ink: "var(--ink-2)", matcha: "var(--matcha)", yuzu: "#A67C14", persimmon: "var(--persimmon)", cocoa: "#A06B3E", muted: "var(--muted)" };
+
+/// a line icon in a soft tinted chip (Lucide)
+export function Ico({ icon: I, tone = "ink", size = 26 }: { icon: LucideIcon; tone?: Tone; size?: number }) {
+  const c = TONE_COLOR[tone];
+  return (
+    <span
+      aria-hidden
+      className="inline-flex shrink-0 items-center justify-center rounded-[8px]"
+      style={{ width: size, height: size, color: c, background: `color-mix(in oklch, ${c} 13%, var(--card))` }}
+    >
+      <I size={Math.round(size * 0.58)} strokeWidth={1.9} />
+    </span>
+  );
+}
+
 export const dGrid = (cols: number, gap = 14): CSSProperties => ({ display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))`, gap });
 
 /// change vs previous: % (or percentage points for rates); `invert` when going down is good
@@ -50,7 +69,11 @@ export function KpiCard({
   foot,
   onClick,
   note,
+  icon,
+  tone,
 }: {
+  icon?: LucideIcon;
+  tone?: Tone;
   label: string;
   value: string;
   cur: number;
@@ -64,8 +87,9 @@ export function KpiCard({
 }) {
   const body = (
     <>
-      <span className={`${labelCls} flex justify-between gap-2`}>
-        {label}
+      <span className={`${labelCls} flex items-center gap-2.5`}>
+        {icon && <Ico icon={icon} tone={tone} size={34} />}
+        <span className="min-w-0 flex-1 truncate">{label}</span>
         {onClick && <span style={{ color: "var(--muted-2)", letterSpacing: 0 }}>›</span>}
       </span>
       <span className="mono num-tick" key={value} style={{ fontSize: 25, fontWeight: 600, letterSpacing: -0.5, color: "var(--ink)", lineHeight: 1.05 }}>
@@ -97,10 +121,31 @@ export function AsOf({ children = "As of today" }: { children?: ReactNode }) {
   return <span className="ml-2 rounded-full bg-paper-2 px-2 py-[2px] align-[2px] text-[10.5px] font-semibold tracking-[0.2px] text-muted">{children}</span>;
 }
 
-export function Panel({ title, sub, right, children, pad = 16, style, asOf }: { title: ReactNode; sub?: ReactNode; right?: ReactNode; children: ReactNode; pad?: number; style?: CSSProperties; asOf?: true | string }) {
+export function Panel({
+  title,
+  sub,
+  right,
+  children,
+  pad = 16,
+  style,
+  asOf,
+  icon,
+  tone,
+}: {
+  title: ReactNode;
+  sub?: ReactNode;
+  right?: ReactNode;
+  children: ReactNode;
+  pad?: number;
+  style?: CSSProperties;
+  asOf?: true | string;
+  icon?: LucideIcon;
+  tone?: Tone;
+}) {
   return (
     <Card style={{ display: "flex", flexDirection: "column", minWidth: 0, ...style }}>
       <div className="flex flex-wrap items-start gap-3 px-4 pt-3.5">
+        {icon && <Ico icon={icon} tone={tone} size={30} />}
         <div className="min-w-[160px] flex-1">
           <div className="text-[14.5px] font-semibold tracking-[-0.1px]">
             {title}
