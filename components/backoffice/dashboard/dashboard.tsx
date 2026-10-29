@@ -248,7 +248,7 @@ function DrillSheet({ d, c, onClose }: { d: Drill; c: DashCtx; onClose: () => vo
                 { k: "kind", label: "", render: (e) => <Pill tone={e.kind === "REFUND" ? "REFUNDED" : "VOIDED"}>{e.kind === "REFUND" ? "Refund" : "Void"}</Pill> },
                 { k: "num", label: "Order", render: (e) => <b className="font-semibold">#{e.order_number ?? "?"}</b> },
                 { k: "when", label: "When", mono: true, render: (e) => <span className="whitespace-nowrap text-[12.5px] text-muted">{`${thDate(bkkDay(e.at))} ${hhmm(e.at)}`}</span> },
-                { k: "staff", label: "By", render: (e) => e.staff_name },
+                { k: "staff", label: "By", render: (e) => e.staff_name ?? "Auto" },
                 { k: "reason", label: "Reason", render: (e) => <span className="text-[12.5px] text-ink-2">{e.reason ?? "—"}</span> },
                 { k: "amt", label: "Amount", align: "right", mono: true, render: (e) => thb(e.amount_satang) },
               ]}

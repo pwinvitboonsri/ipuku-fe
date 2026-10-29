@@ -116,7 +116,8 @@ function AdjustmentList({ list, empty }: { list: ReportAdjustment[]; empty: stri
             <span className="text-ink">{a.reason ?? "No reason recorded"}</span>
             <span className="block text-[12px] text-muted">
               {clock(a.at)}
-              {a.staff_name ? ` · ${a.staff_name}` : ""}
+              {/* no staff: voided by the schedule when the shift closed by itself */}
+              {` · ${a.staff_name ?? "Auto"}`}
               {a.method ? ` · ${methodLabel(a.method)}` : ""}
             </span>
           </span>
@@ -141,8 +142,8 @@ export function ShiftReport({ report: r }: { report: Report }) {
         </span>
         <span>Orders {range}</span>
         <span>
-          Opened by {r.session.opened_by.name}
-          {r.session.closed_by ? ` · closed by ${r.session.closed_by.name}` : ""}
+          {r.session.opened_by ? `Opened by ${r.session.opened_by.name}` : "Opened by the schedule"}
+          {r.session.closed_by ? ` · closed by ${r.session.closed_by.name}` : r.session.auto_closed ? " · closed by the schedule (not counted)" : ""}
         </span>
       </div>
 

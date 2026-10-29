@@ -56,13 +56,16 @@ export type DashMember = {
   birthday_coupon: "USED" | "OPEN" | "EXPIRED" | null;
 };
 
-export type DashEvent = { kind: "VOID" | "REFUND"; order_id: string | null; order_number: number | null; amount_satang: number; staff_name: string; at: string; reason: string | null };
+// staff_name null: voided by the schedule when a shift closed by itself
+export type DashEvent = { kind: "VOID" | "REFUND"; order_id: string | null; order_number: number | null; amount_satang: number; staff_name: string | null; at: string; reason: string | null };
 
 export type Dashboard = {
   /// client side: the range these numbers are for (kept while the next range loads)
   view: Range;
   range: { from: string; to: string; prev_from: string; prev_to: string; prev_until: string };
   now: string;
+  /// Thailand dates the shop was closed (weekly day off or special day), both ranges
+  closed_days: string[];
   program: { points_per_unit: number; unit_satang: number };
   loyalty_since: string | null;
   days: DashDay[];
@@ -72,7 +75,7 @@ export type Dashboard = {
   options: { modifier_option_id: string; name: string; group_name: string; price_delta_satang: number; picked: number; base: number; revenue_satang: number }[];
   staff: { staff_id: string; name: string; role: "OWNER" | "STAFF"; paid_orders: number; net_sales_satang: number; voids: number; refunds: number }[];
   events: DashEvent[];
-  shifts: { id: string; open_at: string; close_at: string; variance_satang: number | null; close_by_staff: { name: string } | null }[];
+  shifts: { id: string; open_at: string; close_at: string; variance_satang: number | null; close_by_staff: { name: string } | null; auto_closed?: boolean }[];
   waste: { ingredient_id: string; name: string; unit: string; entries: number; quantity: number }[];
   rewards: { reward_id: string; name: string; type: string; cost_points: number; cost_currency: "POINTS" | "STAMPS"; image_url: string | null; redemptions: number; discount_satang: number }[];
   reward_discount_satang: number;
@@ -200,7 +203,8 @@ export const claimRate = (s: DashSum) => sdiv(s.claimed, s.walk_orders);
 export const avgTicket = (s: DashSum) => sdiv(s.net_satang, s.orders);
 
 // ── chart series ───────────────────────────────────────────────────
-export type Point = { label: string; full: string; v: number; p: number | null; weekend?: boolean; future?: boolean };
+// closed: the shop was closed that day (shown as such, not as a zero day)
+export type Point = { label: string; full: string; v: number; p: number | null; weekend?: boolean; future?: boolean; closed?: boolean };
 export type Metric = "net" | "orders" | "avg" | "claim" | "new_members" | "waste";
 
 const dayValue = (d: DashDay | undefined, m: Metric) => {
@@ -236,12 +240,15 @@ export function series(D: Dashboard, r: Range, m: Metric, now: Date): Point[] {
     }));
   }
   const byDate = new Map(D.days.map((d) => [d.date, d]));
+  const closed = new Set(D.closed_days ?? []);
   const out: Point[] = [];
   for (let i = 0; i < r.len; i++) {
     const date = addDays(r.from, i);
     const pd = addDays(r.prevFrom, i);
     const w = dow(date);
-    out.push({ label: String(dayNum(date)), full: `${DOW_SUN[w]} ${thDate(date)}`, v: dayValue(byDate.get(date), m), p: pd <= r.prevTo ? dayValue(byDate.get(pd), m) : null, weekend: w === 0 || w === 6 });
+    // a closed day with no sales is "Closed", not a zero; one with sales (opened anyway) shows its numbers
+    const isClosed = closed.has(date) && !byDate.get(date)?.orders;
+    out.push({ label: String(dayNum(date)), full: `${DOW_SUN[w]} ${thDate(date)}`, v: dayValue(byDate.get(date), m), p: pd <= r.prevTo ? dayValue(byDate.get(pd), m) : null, weekend: w === 0 || w === 6, closed: isClosed });
   }
   return out;
 }

@@ -248,7 +248,9 @@ export function DashRewards({ c }: { c: DashCtx }) {
   const maxN = Math.max(1, ...D.rewards.map((x) => x.redemptions));
   const unit = D.program.unit_satang / 100;
   // rule days vs other days: for earn rules limited to some weekdays
-  const inRange = Array.from({ length: r.len }, (_, i) => addDays(r.from, i));
+  // closed days aren't "days" for an average
+  const closed = new Set(D.closed_days ?? []);
+  const inRange = Array.from({ length: r.len }, (_, i) => addDays(r.from, i)).filter((d) => !closed.has(d));
   const net = (d: string) => D.days.find((x) => x.date === d)?.net_satang ?? 0;
   const avgOn = (days: string[]) => sdiv(days.reduce((t, d) => t + net(d), 0), days.length);
   const ruleRows = D.earn_lines.map((l) => {
@@ -393,7 +395,11 @@ export function DashStock({ c }: { c: DashCtx }) {
   const { D, r, cur, compare, narrow, low, now } = c;
   const lowSorted = [...low].sort((a, b) => sdiv(a.stock_quantity, a.reorder_level) - sdiv(b.stock_quantity, b.reorder_level));
   const maxW = Math.max(1, ...D.waste.map((w) => w.entries));
-  const shifts = D.shifts.map((s) => ({ full: `${thDate(bkkDay(s.close_at))}`, v: s.variance_satang ?? 0, sub: s.close_by_staff ? `${s.close_by_staff.name} closed` : undefined }));
+  // shifts closed by the schedule aren't counted, so they have no variance to show
+  const shifts = D.shifts
+    .filter((s) => s.variance_satang != null)
+    .map((s) => ({ full: `${thDate(bkkDay(s.close_at))}`, v: s.variance_satang ?? 0, sub: s.close_by_staff ? `${s.close_by_staff.name} closed` : undefined }));
+  const uncounted = D.shifts.length - shifts.length;
   const short = shifts.filter((s) => s.v < 0);
   return (
     <>
@@ -478,14 +484,20 @@ export function DashStock({ c }: { c: DashCtx }) {
       <Panel
         icon={Scale}
         title="Cash variance per shift"
-        sub={shifts.length ? `${short.length} of ${shifts.length} shift${shifts.length === 1 ? "" : "s"} short · total ${thb(shifts.reduce((s, x) => s + x.v, 0))}` : null}
+        sub={
+          shifts.length
+            ? `${short.length} of ${shifts.length} counted shift${shifts.length === 1 ? "" : "s"} short · total ${thb(shifts.reduce((s, x) => s + x.v, 0))}${uncounted ? ` · ${uncounted} closed by the schedule (not counted)` : ""}`
+            : uncounted
+              ? `${uncounted} shift${uncounted === 1 ? "" : "s"} closed by the schedule (not counted)`
+              : null
+        }
         right={
           <Btn kind="ghost" size="sm" onClick={() => c.go("/backoffice/shifts")}>
             Shifts ›
           </Btn>
         }
       >
-        {shifts.length === 0 ? <EmptyNote title="No closed shifts in this range">Variance appears once a shift is closed and the drawer counted.</EmptyNote> : <DivergingBars data={shifts} />}
+        {shifts.length === 0 ? <EmptyNote title="No counted shifts in this range">Variance appears when a shift is closed by hand and the drawer counted.</EmptyNote> : <DivergingBars data={shifts} />}
       </Panel>
     </>
   );

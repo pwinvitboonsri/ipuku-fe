@@ -214,7 +214,7 @@ export function ShiftOrders() {
   const sel = list.find((o) => o.id === selId) ?? (twoPane ? list[0] : undefined);
   const showList = twoPane || !sel;
   const showDetail = twoPane || !!sel;
-  const opener = staffName(shift.data?.opened_by_staff_id);
+  const opener = shift.data?.auto_opened ? "the schedule" : staffName(shift.data?.opened_by_staff_id);
   const sub = shift.data ? `Opened ${dateTime(shift.data.open_at)}${opener ? ` by ${opener}` : ""} · newest first` : "Newest first";
 
   return (

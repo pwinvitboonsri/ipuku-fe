@@ -2,10 +2,11 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ApiError, api, errorText } from "@/lib/api";
 import { bahtLabel, clock, firstName, money, shortDate } from "@/lib/format";
 import { qk, useNow, useSession, useStaffName } from "@/lib/session";
+import { DAY_LONG, hhmm, useTodayPlan, weekdayOf } from "@/lib/shop-hours";
 import type { CashSession } from "@/lib/types";
 import { Btn } from "@/components/ui/btn";
 import { Card, ErrorNote, labelCls } from "@/components/ui/bits";
@@ -54,7 +55,27 @@ export function OpenShift() {
   const qc = useQueryClient();
   const now = useNow();
   const { data: user } = useSession();
-  const [float, setFloat] = useState(0);
+  const [typed, setTyped] = useState<number | null>(null);
+  const today = useTodayPlan(!!user);
+  const auto = today.data?.auto_shift ?? false;
+  const plan = today.data?.plan;
+  // with automatic shifts the float starts at the owner's default until staff type one
+  const float = typed ?? (auto ? (today.data?.default_float_satang ?? 0) : 0);
+  const setFloat = (f: (v: number) => number) => setTyped((t) => f(t ?? float));
+  const nowMs = now?.getTime() ?? 0;
+  const openAt = plan?.open_at ? new Date(plan.open_at).getTime() : null;
+  const closeAt = plan?.close_at ? new Date(plan.close_at).getTime() : null;
+  const graceMs = (today.data?.grace_minutes ?? 0) * 60_000;
+  const before = auto && plan?.open && openAt != null && nowMs < openAt;
+  const after = auto && plan?.open && closeAt != null && nowMs >= closeAt + graceMs;
+  const closedToday = plan && !plan.open && plan.reason !== "NO_HOURS";
+
+  // before opening time: check every minute, the shift opens by itself at opening time (the shell then goes to Sell)
+  useEffect(() => {
+    if (!before) return;
+    const t = setInterval(() => qc.invalidateQueries({ queryKey: qk.currentShift }), 60_000);
+    return () => clearInterval(t);
+  }, [before, qc]);
 
   const open = useMutation({
     mutationFn: () => api.post<CashSession>("/cash-session/open", { opening_float_satang: float }),
@@ -77,12 +98,26 @@ export function OpenShift() {
     <div className="flex min-h-0 flex-1 overflow-y-auto p-4 sm:p-6" data-screen-label="Open shift">
       <div className="m-auto flex w-full max-w-[820px] flex-wrap items-stretch justify-center gap-5 sm:gap-7">
         <div className="flex flex-[1_1_280px] flex-col justify-center gap-3.5">
-          <div className={labelCls}>No shift open</div>
+          <div className={labelCls}>{closedToday ? "Shop closed today" : before ? "Not open yet" : after ? "Closed for today" : "No shift open"}</div>
           <div className="serif-i text-[28px] leading-[1.1] tracking-[-0.6px] sm:text-[34px]">
             {greeting(now)}, {firstName(user.name)}.
           </div>
           <div className="text-[14px] leading-normal text-ink-2">
-            Count the cash in the drawer and enter it as the opening float. Orders can&apos;t be taken until a shift is open.
+            {closedToday ? (
+              <>
+                Today ({DAY_LONG[weekdayOf(plan.date)]}) is a day off{plan.note ? ` · ${plan.note}` : ""}. Open a shift only if the shop is opening anyway.
+              </>
+            ) : before ? (
+              <>
+                The shift opens by itself at <b>{hhmm(plan?.open_min)}</b>. Open it now if you&apos;re starting early.
+              </>
+            ) : after ? (
+              <>
+                The shop closed at {hhmm(plan?.close_min)} and today&apos;s shift has closed. Open a new one only if you&apos;re still selling.
+              </>
+            ) : (
+              <>Count the cash in the drawer and enter it as the opening float. Orders can&apos;t be taken until a shift is open.</>
+            )}
           </div>
           {user.role === "OWNER" && <LastShiftCard />}
         </div>
@@ -95,7 +130,7 @@ export function OpenShift() {
           </Card>
           <div className="grid grid-cols-3 gap-1.5">
             {QUICK_FLOATS.map((a) => (
-              <Btn key={a} kind={float === a ? "primary" : "ghost"} onClick={() => setFloat(a)} className="mono">
+              <Btn key={a} kind={float === a ? "primary" : "ghost"} onClick={() => setTyped(a)} className="mono">
                 {bahtLabel(a)}
               </Btn>
             ))}
@@ -108,7 +143,7 @@ export function OpenShift() {
             />
           </div>
           <Btn kind="go" size="lg" full disabled={open.isPending} onClick={() => open.mutate()}>
-            {open.isPending ? "Opening…" : `Open shift with ${money(float)}`}
+            {open.isPending ? "Opening…" : `${closedToday || after ? "Open anyway" : "Open shift"} with ${money(float)}`}
           </Btn>
           {open.isError && <ErrorNote>{errorText(open.error)}</ErrorNote>}
         </div>

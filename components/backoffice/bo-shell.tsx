@@ -14,6 +14,7 @@ export const BO_NAV = [
   { id: "/backoffice/inventory", label: "Inventory" },
   { id: "/backoffice/history", label: "Stock history" },
   { id: "/backoffice/shifts", label: "Shifts" },
+  { id: "/backoffice/hours", label: "Opening hours" },
   { id: "/backoffice/staff", label: "Staff" },
   { id: "/backoffice/loyalty", label: "Loyalty" },
 ];

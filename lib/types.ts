@@ -212,8 +212,12 @@ export type CashSession = {
   variance_satang: number | null;
   open_at: string;
   close_at: string | null;
-  opened_by_staff_id: string;
+  /// null = opened by the shop schedule (auto shift)
+  opened_by_staff_id: string | null;
   close_by_staff_id: string | null;
+  auto_opened?: boolean;
+  /// closed by the schedule: no cash count, variance empty
+  auto_closed?: boolean;
   // GET /cash-session (list) only: PAID orders and their total = net sales
   paid_orders?: number;
   net_sales_satang?: number;
@@ -237,8 +241,11 @@ export type ShiftReport = {
     open_at: string;
     close_at: string | null;
     duration_minutes: number | null;
-    opened_by: StaffRef;
+    /// null = opened by the shop schedule
+    opened_by: StaffRef | null;
     closed_by: StaffRef | null;
+    auto_opened?: boolean;
+    auto_closed?: boolean;
     first_order_number: number | null;
     last_order_number: number | null;
   };

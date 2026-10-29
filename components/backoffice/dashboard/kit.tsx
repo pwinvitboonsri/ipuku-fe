@@ -197,7 +197,7 @@ export function BarChart({
         {h ? (
           <>
             <span className="font-semibold">{h.full}</span>
-            <span>{h.future ? "not yet" : fmt(h.v)}</span>
+            <span>{h.future ? "not yet" : h.closed ? "closed" : fmt(h.v)}</span>
             {compare && h.p != null && <span className="text-muted">prev {fmt(h.p)}</span>}
           </>
         ) : (
@@ -208,6 +208,10 @@ export function BarChart({
         {data.map((d, i) => (
           <div key={i} onMouseEnter={() => setHi(i)} onClick={() => setHi(i)} className="relative flex h-full min-w-0 flex-1 cursor-pointer items-end">
             {compare && d.p != null && <div className="absolute inset-x-0 bottom-0 rounded-t-[3px] bg-paper-3" style={{ height: `${(Math.abs(d.p) / max) * 100}%` }} />}
+            {d.closed && (
+              // a day the shop was closed: a dashed placeholder instead of an empty slot
+              <div className="absolute inset-x-0 bottom-0 rounded-t-[3px] border border-dashed border-line-2" style={{ height: "38%", background: hi === i ? "var(--paper-3)" : "transparent" }} />
+            )}
             <div
               className="relative mx-auto rounded-t-[3px]"
               style={{

@@ -46,14 +46,14 @@ export function Shifts() {
 
   return (
     <div className="scroll flex flex-1 flex-col gap-3.5 overflow-y-auto p-3 sm:p-5 lg:p-[22px]" data-noshrink="1" data-screen-label="Back office · Shifts">
-      <PageHead title="Shifts" sub="Past cash sessions — tap one for its sales report. Variance = counted − (float + cash taken − cash refunded)." />
+      <PageHead title="Shifts" sub="Past cash sessions — tap one for its sales report. Variance = counted − (float + cash taken − cash refunded). Shifts the schedule closed aren't counted." />
       {cur && (
         <button type="button" onClick={() => setSel(cur)} className="tap text-left">
           <Card pad={14} className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
             <Pill tone="OPEN">Open now</Pill>
             <span className="text-[13.5px]">
               {shortDate(cur.open_at)} · opened {clock(cur.open_at)}
-              {names(cur.opened_by_staff_id) ? ` by ${names(cur.opened_by_staff_id)}` : ""} · float <span className="mono">{money(cur.opening_float_satang)}</span>
+              {cur.auto_opened ? " by the schedule" : names(cur.opened_by_staff_id) ? ` by ${names(cur.opened_by_staff_id)}` : ""} · float <span className="mono">{money(cur.opening_float_satang)}</span>
             </span>
           </Card>
         </button>
@@ -80,8 +80,10 @@ export function Shifts() {
               <tbody>
                 {past.map((s) => {
                   const v = s.variance_satang ?? 0;
-                  const by = names(s.opened_by_staff_id) ?? "—";
-                  const closedBy = names(s.close_by_staff_id);
+                  // the schedule opens/closes shifts with no staff and no cash count
+                  const by = s.auto_opened ? "Auto" : (names(s.opened_by_staff_id) ?? "—");
+                  const closedBy = s.auto_closed ? "Auto" : names(s.close_by_staff_id);
+                  const counted = s.counted_cash_satang != null;
                   return (
                     <tr key={s.id} onClick={() => setSel(s)} className="cursor-pointer" style={{ background: sel?.id === s.id ? "var(--paper-2)" : "transparent" }}>
                       <td className={`${tdCls} whitespace-nowrap font-medium`}>{shortDate(s.open_at)}</td>
@@ -96,9 +98,9 @@ export function Shifts() {
                       <td className={`${tdCls} mono text-right font-medium`}>{s.net_sales_satang != null ? money(s.net_sales_satang) : "—"}</td>
                       <td className={`${tdCls} mono text-right`}>{money(s.opening_float_satang)}</td>
                       <td className={`${tdCls} mono text-right`}>{money(s.expect_cash_satang ?? 0)}</td>
-                      <td className={`${tdCls} mono text-right`}>{money(s.counted_cash_satang ?? 0)}</td>
-                      <td className={`${tdCls} mono text-right font-semibold`} style={{ color: tone(v) }}>
-                        {signed(v)}
+                      <td className={`${tdCls} mono text-right`}>{counted ? money(s.counted_cash_satang!) : <span className="text-muted">not counted</span>}</td>
+                      <td className={`${tdCls} mono text-right font-semibold`} style={{ color: counted ? tone(v) : "var(--muted)" }}>
+                        {counted ? signed(v) : "—"}
                       </td>
                     </tr>
                   );
