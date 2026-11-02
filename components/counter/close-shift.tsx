@@ -7,7 +7,7 @@ import { api, errorText } from "@/lib/api";
 import { clock, money, shortDate } from "@/lib/format";
 import { orderSummary, useShiftOrders } from "@/lib/orders";
 import { useShiftReport } from "@/lib/reports";
-import { useCurrentShift, useSignOut } from "@/lib/session";
+import { qk, useCurrentShift, useSignOut } from "@/lib/session";
 import type { CashSession } from "@/lib/types";
 import { Btn } from "@/components/ui/btn";
 import { Card, ErrorNote, Pill, Spinner, Stat, labelCls } from "@/components/ui/bits";
@@ -91,8 +91,12 @@ export function CloseShift() {
 
   const close = useMutation({
     mutationFn: () => api.post<CashSession>("/cash-session/close", { id: shift.data!.id, counted_cash_satang: counted }),
-    // Don't touch the current-shift cache yet, or the app would jump to Open shift before the summary is read.
-    onSuccess: (s) => setClosed(s),
+    // The summary stays up (closed is set first, so the no-shift redirect below skips it); clearing the
+    // current shift turns the header's Close shift tab into Open shift.
+    onSuccess: (s) => {
+      setClosed(s);
+      qc.setQueryData(qk.currentShift, null);
+    },
   });
 
   // No open shift and nothing just closed → go open one.

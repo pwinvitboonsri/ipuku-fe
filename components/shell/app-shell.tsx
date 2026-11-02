@@ -66,7 +66,7 @@ function AccountMenu({ onClose, onMyPin, onSettings, onSignOut }: { onClose: () 
   );
 }
 
-function AppHeader({ user, shiftSince, onAccount }: { user: SessionStaff; shiftSince?: string; onAccount: () => void }) {
+function AppHeader({ user, shiftSince, noShift, onAccount }: { user: SessionStaff; shiftSince?: string; noShift: boolean; onAccount: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const isOwner = user.role === "OWNER";
@@ -113,7 +113,8 @@ function AppHeader({ user, shiftSince, onAccount }: { user: SessionStaff; shiftS
                 items={[
                   { id: "/sell", label: "Sell" },
                   { id: "/orders", label: "Orders", badge: openOrders.data ?? 0 },
-                  { id: "/close", label: "Close shift" },
+                  // nothing to close without a shift (e.g. after closing, or after skipping it): offer to open one instead
+                  noShift ? { id: "/open-shift", label: "Open shift" } : { id: "/close", label: "Close shift" },
                 ]}
               />
             </nav>
@@ -218,7 +219,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="relative flex h-full flex-col bg-paper">
-      <AppHeader user={session.data} shiftSince={opened ? clock(opened) : undefined} onAccount={() => setAccount((a) => !a)} />
+      <AppHeader user={session.data} shiftSince={opened ? clock(opened) : undefined} noShift={noShift} onAccount={() => setAccount((a) => !a)} />
       {!online && <OfflineBanner />}
       <CartProvider>
         <div key={pathname.startsWith("/backoffice") ? "bo" : pathname} className="screen-enter relative flex min-h-0 flex-1 flex-col">

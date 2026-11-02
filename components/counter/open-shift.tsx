@@ -146,6 +146,12 @@ export function OpenShift() {
             {open.isPending ? "Opening…" : `${closedToday || after ? "Open anyway" : "Open shift"} with ${money(float)}`}
           </Btn>
           {open.isError && <ErrorNote>{errorText(open.error)}</ErrorNote>}
+          {/* The dashboard and settings don't need a shift; selling does (Sell and Orders bring you back here). */}
+          {user.role === "OWNER" && (
+            <Btn kind="ghost" full onClick={() => router.push("/backoffice")}>
+              Not now · go to Back office
+            </Btn>
+          )}
         </div>
       </div>
     </div>
