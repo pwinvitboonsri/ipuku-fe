@@ -29,9 +29,10 @@ export function useStaffList() {
     queryKey: ["staff-list"],
     queryFn: async () => (await api.get<{ user: Staff[]; total: number }>("/auth")).user ?? [],
     staleTime: 5 * 60_000,
-    // The sign-in screen's first call often meets an API that's asleep (Render takes 30–60 s to wake):
-    // keep trying every 10 s instead of leaving staff on an error until someone taps Retry.
-    refetchInterval: (q) => (q.state.status === "error" ? 10_000 : false),
+    // While the API is unreachable (asleep) only /health is polled — Render answers a burst of calls with
+    // 429 — and the sign-in screen reloads the staff once it's back. Other errors retry every 10 s.
+    retry: (n) => connectivity.get() && n < 3,
+    refetchInterval: (q) => (q.state.status === "error" && connectivity.get() ? 10_000 : false),
   });
 }
 
