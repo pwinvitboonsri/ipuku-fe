@@ -76,15 +76,13 @@ export async function callBackend(
       cache: "no-store",
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
-    // Render answers with its own non-JSON 502/503/504 — or a plain-text 429 to requests from this Worker —
-    // while the API sleeps, wakes or restarts. That isn't NestJS speaking (its errors, including its own
-    // rate-limit 429, are JSON): report it as unreachable so the app shows the offline banner and the
-    // browser wakes the API, instead of printing the text as an error. A 429 goes out as 503 so the
-    // sign-in screen doesn't mistake it for "too many PIN attempts".
-    const notJson = !res.headers.get("content-type")?.includes("application/json");
-    if (notJson && ((res.status >= 502 && res.status <= 504) || res.status === 429)) {
+    // Every NestJS response is JSON (errors and its own rate-limit 429 included). Anything else is Render
+    // speaking while the API sleeps, wakes or restarts: a 502–504 page, a plain-text 429, or a 200 HTML
+    // "waking up" page for /health. Report it as unreachable (503 unless it's already 5xx, so the sign-in
+    // screen doesn't read a 429 as "too many PIN attempts") so the app keeps polling /health, which wakes it.
+    if (!res.headers.get("content-type")?.includes("application/json")) {
       console.warn(`[api] ${method} ${pathAndQuery} → upstream ${res.status} (not JSON): API asleep, starting or down`);
-      const status = res.status === 429 ? 503 : res.status;
+      const status = res.status >= 502 && res.status <= 504 ? res.status : 503;
       return Response.json(
         { statusCode: status, error: "Server unavailable", message: "The server is starting up — try again in a minute" },
         { status, headers: unreachable() },

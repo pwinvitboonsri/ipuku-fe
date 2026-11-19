@@ -4,8 +4,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { ApiError, errorText, request } from "@/lib/api";
+import { connectivity } from "@/lib/connectivity";
 import { firstName } from "@/lib/format";
-import { useNow, useStaffList } from "@/lib/session";
+import { useNow, useOnline, useStaffList } from "@/lib/session";
 import { staffTone } from "@/lib/tone";
 import type { SessionStaff, Staff } from "@/lib/types";
 import { Btn } from "@/components/ui/btn";
@@ -135,11 +136,39 @@ function PinNumpad({ onDigit, onBack, onSubmit, canSubmit, disabled }: { onDigit
   );
 }
 
+// Render's free plan sleeps when idle; waking took 30–45 s in practice. The bar is an estimate, held
+// short of full until the server answers.
+const WAKE_ESTIMATE_MS = 60_000;
+
+function WakeProgress() {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const pct = Math.min(95, Math.max(1, Math.round(((now - connectivity.offlineSince()) / WAKE_ESTIMATE_MS) * 100)));
+  return (
+    <div className="mx-auto flex max-w-[300px] flex-col items-center gap-2 pt-5 text-center" role="status" aria-live="polite">
+      <div className="text-[13px] font-semibold text-ink-2">Waking up the server… {pct}%</div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-paper-3">
+        <div className="h-full rounded-full bg-matcha transition-[width] duration-1000 ease-linear" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="text-[11.5px] text-muted">After a quiet spell this takes about a minute. It continues by itself.</div>
+    </div>
+  );
+}
+
 export function PinLogin() {
   const router = useRouter();
   const qc = useQueryClient();
   const now = useNow();
   const staffQ = useStaffList();
+  // While the API is unreachable this polls /health, which is what wakes a sleeping Render instance
+  const online = useOnline();
+  const { refetch: refetchStaff, isError: staffFailed } = staffQ;
+  useEffect(() => {
+    if (online && staffFailed) refetchStaff(); // back up: load the staff now instead of on the next 10 s retry
+  }, [online, staffFailed, refetchStaff]);
   const staff = staffQ.data ?? [];
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -224,8 +253,9 @@ export function PinLogin() {
           </div>
 
           <div className="min-h-[106px] w-full self-stretch">
-            {staffQ.isPending && <div className="pt-9 text-center text-[12.5px] text-muted">Loading staff…</div>}
-            {staffQ.isError && (
+            {!online && !staffQ.isSuccess && <WakeProgress />}
+            {online && staffQ.isPending && <div className="pt-9 text-center text-[12.5px] text-muted">Loading staff…</div>}
+            {online && staffQ.isError && (
               <div className="flex flex-col items-center gap-2 pt-5 text-center">
                 <div className="text-[13px] font-semibold text-persimmon-2">Couldn&apos;t load the staff list</div>
                 <div className="text-[12px] text-muted">{errorText(staffQ.error)}</div>

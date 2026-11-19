@@ -48,7 +48,7 @@ export function useCurrentShift(enabled = true) {
   });
 }
 
-const HEALTH_RETRY_MS = 10_000;
+const HEALTH_RETRY_MS = 5_000;
 
 // Server reachability for the offline banner. No polling while online — requests themselves
 // report failures (lib/connectivity). Only while offline is /health checked, every 10 s, until it answers.

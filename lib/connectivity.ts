@@ -8,11 +8,13 @@ export const UNREACHABLE_HEADER = "x-ipk-upstream";
 export const WAKE_HEADER = "x-ipk-wake";
 
 let online = true;
+let offlineSince = 0; // when the current outage started, for the wake progress on the sign-in screen
 const listeners = new Set<() => void>();
 
 function set(next: boolean) {
   if (online === next) return;
   online = next;
+  if (!next) offlineSince = Date.now();
   listeners.forEach((l) => l());
 }
 
@@ -20,6 +22,7 @@ export const connectivity = {
   markOffline: () => set(false),
   markOnline: () => set(true),
   get: () => online,
+  offlineSince: () => offlineSince,
   subscribe(cb: () => void) {
     listeners.add(cb);
     const off = () => set(false);
